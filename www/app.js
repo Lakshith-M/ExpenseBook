@@ -1668,6 +1668,7 @@ function uploadFileToHistory(file) {
     
     const historyDoc = {
         id: docId,
+        accountId: activeAccountId, // Bind this import to the active account
         fileName: file.name,
         timestamp: timestamp,
         url: null
@@ -1693,14 +1694,17 @@ function renderImportHistory() {
     
     list.innerHTML = '';
     
-    if (importHistory.length === 0) {
+    // Filter history to only show items that match the active account (fallback to 'acc_default' for legacy imports)
+    const filteredHistory = importHistory.filter(item => (item.accountId || 'acc_default') === activeAccountId);
+    
+    if (filteredHistory.length === 0) {
         list.style.display = 'none';
         noMsg.style.display = 'block';
     } else {
         list.style.display = 'flex';
         noMsg.style.display = 'none';
         
-        importHistory.forEach(item => {
+        filteredHistory.forEach(item => {
             const li = document.createElement('li');
             li.className = 'category-item';
             const dateStr = new Date(item.timestamp).toLocaleString();
