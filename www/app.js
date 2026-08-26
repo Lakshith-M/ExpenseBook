@@ -361,6 +361,15 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
             }
         } catch (err) {
             console.error('Category suggestion failed', err);
+            if (err.message === 'API_KEY_MISSING') {
+                const key = prompt('Please enter your OpenAI API key to use AI categorization:');
+                if (key) {
+                    localStorage.setItem('expensebook_openai_key', key);
+                    alert('API key saved! Try saving again.');
+                }
+            } else {
+                alert('AI suggestion failed: ' + err.message);
+            }
         } finally {
             spinner.classList.add('hidden');
         }
@@ -407,19 +416,35 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
 });
 
 // Add Category Form
-document.getElementById('addCategoryForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const input = document.getElementById('newCategoryName');
-    const newCat = input.value.trim();
-
-    if (newCat && !categories.includes(newCat)) {
-        categories.push(newCat);
-        saveCategories();
-        renderCategoryList();
-        populateCategoryDropdowns();
-        input.value = '';
+document.getElementById('autoAssignBtn').addEventListener('click', async () => {
+    const rawTitle = document.getElementById('title').value.trim();
+    if (!rawTitle) {
+        alert('Please enter a title before requesting AI suggestion.');
+        return;
+    }
+    const spinner = document.getElementById('categorySpinner');
+    spinner.classList.remove('hidden');
+    try {
+        const suggestion = await getCategory(rawTitle);
+        if (suggestion && suggestion.category) {
+            document.getElementById('category').value = suggestion.category;
+        }
+    } catch (err) {
+        console.error('Category suggestion failed', err);
+        if (err.message === 'API_KEY_MISSING') {
+            const key = prompt('Please enter your OpenAI API key to use Auto-assign:');
+            if (key) {
+                localStorage.setItem('expensebook_openai_key', key);
+                alert('API key saved! Try clicking Auto-assign again.');
+            }
+        } else {
+            alert('AI suggestion failed: ' + err.message + '\n\nCheck console for details.');
+        }
+    } finally {
+        spinner.classList.add('hidden');
     }
 });
+
 
 // Add Account Form
 document.getElementById('addAccountForm').addEventListener('submit', (e) => {
@@ -1782,3 +1807,8 @@ function deleteImportHistoryItem(id) {
 
 // Start
 init();
+
+// Export to window for inline onclick handlers
+window.editTransaction = editTransaction;
+window.deleteTransaction = deleteTransaction;
+window.deleteCategory = deleteCategory;

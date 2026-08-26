@@ -223,9 +223,15 @@
                 </div>
                 <div class="form-group">
                     <label>Category</label>
-                    <select id="category" required>
-                        <!-- Categories injected by JS -->
-                    </select>
+                    <div class="category-wrapper" style="display:flex; align-items:center;">
+                        <select id="category" required style="flex:1;">
+                            <!-- Categories injected by JS -->
+                        </select>
+                        <button type="button" id="autoAssignBtn" class="icon-btn" title="Auto‑assign category" style="margin-left:8px;">
+                            <i class="fa-solid fa-magic"></i>
+                        </button>
+                        <div id="categorySpinner" class="spinner hidden" style="margin-left:8px;"></div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Date</label>
@@ -361,7 +367,8 @@
     </div>
     </div>
 
-    <script src="app.js?v=10"></script>
+    <script type="module" src="categorise.js"></script>
+    <script type="module" src="app.js?v=10"></script>
 </body>
 
 </html>

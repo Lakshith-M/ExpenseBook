@@ -5,7 +5,10 @@
  * @returns {Promise<{category:string, confidence:number}>}
  */
 export async function getCategory(text) {
-  const apiKey = 'YOUR_OPENAI_API_KEY'; // <-- replace with your key
+  const apiKey = localStorage.getItem('expensebook_openai_key');
+  if (!apiKey) {
+    throw new Error('API_KEY_MISSING');
+  }
   const prompt = `You are a personal-finance assistant. Return ONLY a short, single word expense category (e.g., Food, Transport, Utilities, Entertainment, Salary, Other) for the following transaction description:\n\n"${text}"`;
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -21,6 +24,9 @@ export async function getCategory(text) {
   });
   if (!response.ok) throw new Error('OpenAI request failed');
   const data = await response.json();
+  if (data.error) {
+    throw new Error(data.error.message);
+  }
   const category = data.choices[0].message.content.trim();
   return { category, confidence: 1 };
 }
