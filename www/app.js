@@ -1,3 +1,4 @@
+import { getCategory } from './categorise.js';
 let importHistory = [];
 let accounts = [];
 let activeAccountId = 'acc_default';
@@ -338,7 +339,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 // Add / Edit Transaction Form
-document.getElementById('transactionForm').addEventListener('submit', (e) => {
+document.getElementById('transactionForm').addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const txId = document.getElementById('txId').value;
@@ -346,7 +347,24 @@ document.getElementById('transactionForm').addEventListener('submit', (e) => {
     const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
     const amount = parseFloat(document.getElementById('amount').value);
     const rawTitle = document.getElementById('title').value.trim();
-    const category = document.getElementById('category').value;
+    let category = document.getElementById('category').value;
+    let suggestion = null;
+    // If category empty, ask AI
+    if (!category) {
+        const spinner = document.getElementById('categorySpinner');
+        spinner.classList.remove('hidden');
+        try {
+            suggestion = await getCategory(rawTitle);
+            if (suggestion && suggestion.category) {
+                category = suggestion.category;
+                document.getElementById('category').value = category;
+            }
+        } catch (err) {
+            console.error('Category suggestion failed', err);
+        } finally {
+            spinner.classList.add('hidden');
+        }
+    }
     const title = rawTitle || category;
     const date = document.getElementById('date').value;
 
@@ -358,12 +376,14 @@ document.getElementById('transactionForm').addEventListener('submit', (e) => {
         amount,
         title,
         category,
-        date
+        date,
+        aiSuggested: !!(suggestion && suggestion.category),
+        catScore: suggestion ? suggestion.confidence : null
     };
 
     // Save for next time
     lastAddedTx = { type, paymentMethod, title, category };
-    
+
     // Reset and close immediately
     e.target.reset();
     document.getElementById('txId').value = '';
@@ -376,7 +396,7 @@ document.getElementById('transactionForm').addEventListener('submit', (e) => {
     } else {
         transactions.push(tx);
     }
-    
+
     localStorage.setItem('expensebook_transactions', JSON.stringify(transactions));
     sortTransactions();
     lastUpdated = new Date().toLocaleString();
