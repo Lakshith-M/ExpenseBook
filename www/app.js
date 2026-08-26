@@ -40,6 +40,16 @@ let lastAddedTx = null; // Remembers the last added transaction's details
 const themeToggleBtn = document.getElementById('themeToggleBtn');
 let currentTheme = localStorage.getItem('expensebook_theme') || 'dark';
 
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function applyTheme(theme) {
     if (theme === 'light') {
         document.documentElement.setAttribute('data-theme', 'light');
@@ -702,9 +712,9 @@ function renderTransactions() {
             </div>
             <div class="tx-row tx-body-row">
                 <div class="tx-title-group">
-                    <h4>${displayTitle}</h4>
-                    <span class="tx-category-badge" title="Original: ${tx.title}">
-                        <i class="fa-solid fa-tag" style="margin-right: 4px;"></i>${tx.category} &nbsp;|&nbsp; ${methodIcon} ${txMethod}
+                    <h4>${escapeHTML(displayTitle)}</h4>
+                    <span class="tx-category-badge" title="Original: ${escapeHTML(tx.title)}">
+                        <i class="fa-solid fa-tag" style="margin-right: 4px;"></i>${escapeHTML(tx.category)} &nbsp;|&nbsp; ${methodIcon} ${txMethod}
                     </span>
                 </div>
                 <div class="tx-balance-group">
@@ -729,8 +739,8 @@ function renderCategoryList() {
         const li = document.createElement('li');
         li.className = 'category-item';
         li.innerHTML = `
-            <span>${cat}</span>
-            <button onclick="deleteCategory('${cat}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+            <span>${escapeHTML(cat)}</span>
+            <button onclick="deleteCategory('${escapeHTML(cat)}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
         `;
         list.appendChild(li);
     });
@@ -755,7 +765,7 @@ function renderAccountList() {
         div.style.background = 'var(--surface)';
 
         div.innerHTML = `
-            <span class="account-name-text" style="flex: 1; font-weight: 500;">${acc.name} ${acc.id === 'acc_default' ? '<span style="font-size: 0.75rem; color: var(--text-secondary); opacity: 0.8;">(Default)</span>' : ''}</span>
+            <span class="account-name-text" style="flex: 1; font-weight: 500;">${escapeHTML(acc.name)} ${acc.id === 'acc_default' ? '<span style="font-size: 0.75rem; color: var(--text-secondary); opacity: 0.8;">(Default)</span>' : ''}</span>
             <div class="account-actions" style="display: flex; gap: 8px; align-items: center;">
                 <button class="icon-btn edit-btn" title="Rename"><i class="fa-solid fa-pen"></i></button>
                 <button class="icon-btn delete-btn" title="Delete"><i class="fa-solid fa-trash"></i></button>
