@@ -370,7 +370,6 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
                 document.getElementById('category').value = category;
             }
         } catch (err) {
-        } catch (err) {
             console.error('Category suggestion failed (fallback failed?)', err);
         } finally {
             spinner.classList.add('hidden');
