@@ -370,16 +370,8 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
                 document.getElementById('category').value = category;
             }
         } catch (err) {
-            console.error('Category suggestion failed', err);
-            if (err.message === 'API_KEY_MISSING') {
-                const key = prompt('Please enter your OpenAI API key to use AI categorization:');
-                if (key) {
-                    localStorage.setItem('expensebook_openai_key', key);
-                    alert('API key saved! Try saving again.');
-                }
-            } else {
-                alert('AI suggestion failed: ' + err.message);
-            }
+        } catch (err) {
+            console.error('Category suggestion failed (fallback failed?)', err);
         } finally {
             spinner.classList.add('hidden');
         }
@@ -441,15 +433,6 @@ document.getElementById('autoAssignBtn').addEventListener('click', async () => {
         }
     } catch (err) {
         console.error('Category suggestion failed', err);
-        if (err.message === 'API_KEY_MISSING') {
-            const key = prompt('Please enter your OpenAI API key to use Auto-assign:');
-            if (key) {
-                localStorage.setItem('expensebook_openai_key', key);
-                alert('API key saved! Try clicking Auto-assign again.');
-            }
-        } else {
-            alert('AI suggestion failed: ' + err.message + '\n\nCheck console for details.');
-        }
     } finally {
         spinner.classList.add('hidden');
     }
