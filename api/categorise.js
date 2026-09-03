@@ -43,7 +43,9 @@ export default async function handler(req, res) {
     });
     
     if (!response.ok) {
-      throw new Error('Gemini API request failed');
+      const errorText = await response.text();
+      console.error("Gemini raw error:", errorText);
+      throw new Error(`Gemini API Error: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
