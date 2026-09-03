@@ -1214,6 +1214,15 @@ async function exportToPDF() {
     }
 }
 
+// Set Gemini API Key
+document.getElementById('setApiKeyBtn').addEventListener('click', () => {
+    const key = prompt('Please enter your Google Gemini API Key:');
+    if (key) {
+        localStorage.setItem('expensebook_gemini_key', key.trim());
+        alert('Gemini API Key saved successfully!');
+    }
+});
+
 // Unified Import Logic (Excel & PDF)
 document.getElementById('importExcelBtn').addEventListener('click', () => {
     document.getElementById('excelFileInput').click();

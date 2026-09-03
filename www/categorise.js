@@ -15,34 +15,34 @@ export async function getCategory(text) {
     return 'Personal';
   };
 
-  const apiKey = localStorage.getItem('expensebook_openai_key');
+  const apiKey = localStorage.getItem('expensebook_gemini_key');
   if (!apiKey) {
     return { category: localFallback(), confidence: 0.8 };
   }
 
   try {
     const prompt = `You are a personal-finance assistant. Return ONLY a short, single word expense category (e.g., Food, Transport, Utilities, Entertainment, Salary, Other) for the following transaction description:\n\n"${text}"`;
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0,
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0 },
       }),
     });
     
-    if (!response.ok) throw new Error('OpenAI request failed');
+    if (!response.ok) throw new Error('Gemini request failed');
     const data = await response.json();
     if (data.error) throw new Error(data.error.message);
     
-    const category = data.choices[0].message.content.trim();
+    let category = data.candidates[0].content.parts[0].text.trim();
+    // Sometimes Gemini adds periods or newlines, so we clean it up
+    category = category.replace(/[^a-zA-Z]/g, '');
     return { category, confidence: 1 };
   } catch (err) {
-    console.warn("OpenAI API failed, using local fallback categorizer. Error:", err);
+    console.warn("Gemini API failed, using local fallback categorizer. Error:", err);
     return { category: localFallback(), confidence: 0.5 };
   }
 }
