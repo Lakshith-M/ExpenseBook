@@ -2,6 +2,7 @@
   "name": "dukaan",
   "version": "1.0.0",
   "description": "",
+  "type": "module",
   "main": "app.js",
   "scripts": {
     "dev": "npx -y serve www",
@@ -22,8 +23,9 @@
   "dependencies": {
     "@capacitor/core": "^8.4.1",
     "@capacitor/filesystem": "^8.1.2",
-    "serve": "^14.2.0",
-    "pdfjs-dist": "^6.0.227"
+    "@google/generative-ai": "^0.24.1",
+    "pdfjs-dist": "^6.0.227",
+    "serve": "^14.2.0"
   },
   "devDependencies": {
     "@capacitor/android": "^8.4.1",

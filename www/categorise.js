@@ -25,7 +25,14 @@ export async function getCategory(text) {
       body: JSON.stringify({ text }),
     });
     
-    if (!response.ok) throw new Error('Backend request failed');
+    if (!response.ok) {
+        let errStr = 'Backend request failed';
+        try {
+            const errData = await response.json();
+            if (errData.error) errStr = errData.error;
+        } catch(e) {}
+        throw new Error(errStr);
+    }
     const data = await response.json();
     if (data.error) throw new Error(data.error);
     
