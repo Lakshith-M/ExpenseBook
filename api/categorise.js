@@ -34,9 +34,30 @@ export default async function handler(req, res) {
     const prompt = `You are a personal-finance assistant. Return ONLY a short, single word expense category (e.g., Food, Transport, Utilities, Entertainment, Salary, Other) for the following transaction description:\n\n"${text}"`;
     
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    let model;
+    let result;
     
-    const result = await model.generateContent(prompt);
+    // Try different model variations to account for region/project availability
+    const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.0-pro"];
+    
+    for (const modelName of modelsToTry) {
+      try {
+        model = genAI.getGenerativeModel({ model: modelName });
+        result = await model.generateContent(prompt);
+        break; // If successful, exit the loop
+      } catch (e) {
+        if (e.message.includes("404") || e.message.includes("not found")) {
+          console.log(`Model ${modelName} not found, trying next...`);
+          continue;
+        }
+        throw e; // If it's a different error (like auth), throw it
+      }
+    }
+    
+    if (!result) {
+      throw new Error("None of the Gemini models were available for your API key/project scope.");
+    }
+    
     const responseText = result.response.text();
     
     let category = responseText.trim();
