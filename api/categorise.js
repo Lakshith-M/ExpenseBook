@@ -37,8 +37,8 @@ export default async function handler(req, res) {
     let model;
     let result;
     
-    // Try different model variations to account for region/project availability
     const modelsToTry = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.0-pro"];
+    let errors = [];
     
     for (const modelName of modelsToTry) {
       try {
@@ -46,16 +46,12 @@ export default async function handler(req, res) {
         result = await model.generateContent(prompt);
         break; // If successful, exit the loop
       } catch (e) {
-        if (e.message.includes("404") || e.message.includes("not found")) {
-          console.log(`Model ${modelName} not found, trying next...`);
-          continue;
-        }
-        throw e; // If it's a different error (like auth), throw it
+        errors.push({ model: modelName, message: e.message });
       }
     }
     
     if (!result) {
-      throw new Error("None of the Gemini models were available for your API key/project scope.");
+      return res.status(500).json({ error: "API Failure: " + JSON.stringify(errors) });
     }
     
     const responseText = result.response.text();
