@@ -35,11 +35,32 @@ export default async function handler(req, res) {
     
     const groq = new Groq({ apiKey });
     
-    const result = await groq.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      model: 'llama-3.1-8b-instant',
-      temperature: 0,
-    });
+    const modelsToTry = [
+      'llama-3.3-70b-versatile',
+      'llama-3.1-8b-instant',
+      'gemma2-9b-it',
+      'mixtral-8x7b-32768'
+    ];
+    
+    let result;
+    let errors = [];
+    
+    for (const modelName of modelsToTry) {
+      try {
+        result = await groq.chat.completions.create({
+          messages: [{ role: 'user', content: prompt }],
+          model: modelName,
+          temperature: 0,
+        });
+        break;
+      } catch (e) {
+        errors.push({ model: modelName, message: e.message });
+      }
+    }
+    
+    if (!result) {
+      return res.status(500).json({ error: "API Failure: " + JSON.stringify(errors) });
+    }
     
     let category = result.choices[0]?.message?.content?.trim() || 'Other';
     category = category.replace(/[^a-zA-Z]/g, '');
