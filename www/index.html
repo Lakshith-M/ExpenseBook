@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <title>ExpenseBook - Expense & UPI Tracker</title>
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -19,6 +19,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- HTML5 QR Code -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- QRCode.js for generating QR codes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <!-- PDF.js for PDF Import -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -48,7 +50,7 @@
                     </div>
 
                     <div class="dropdown-container" style="position: relative;">
-                        <button id="menuDropdownBtn" class="icon-btn" title="Menu"><i
+                        <button id="menuDropdownBtn" class="icon-btn" title="Menu" onclick="document.getElementById('menuDropdown').classList.toggle('hidden')"><i
                                 class="fa-solid fa-ellipsis-vertical"></i></button>
                         <div id="menuDropdown" class="dropdown-content hidden"
                             style="position: absolute; right: 0; top: 120%; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; box-shadow: var(--shadow-lg); z-index: 100; min-width: 180px;">
@@ -101,7 +103,23 @@
                     </div>
                 </div>
             </div>
-
+            <div class="stats-row" style="margin-top: 12px;">
+                <div class="card stat-card" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2);">
+                    <div class="icon-wrapper" style="background: rgba(16, 185, 129, 0.2); color: #10b981;"><i class="fa-solid fa-building-columns"></i></div>
+                    <div>
+                        <p>UPI / Bank</p>
+                        <h4 id="totalUPI">₹0</h4>
+                    </div>
+                </div>
+                <div class="card stat-card" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2);">
+                    <div class="icon-wrapper" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;"><i class="fa-solid fa-money-bill-1-wave"></i></div>
+                    <div>
+                        <p>Cash</p>
+                        <h4 id="totalCash">₹0</h4>
+                    </div>
+                </div>
+            </div>
+            </div>
 
             <div class="tabs-container">
                 <button class="tab-btn active" data-tab="listTab">Transactions</button>
@@ -236,9 +254,11 @@
                     <label>Date</label>
                     <input type="date" id="date" required>
                 </div>
-                
                 <button type="button" id="showUpiPayBtn" class="btn" style="background: #10b981; color: white; margin-bottom: 10px; width: 100%; display: none;">
                     <i class="fa-solid fa-qrcode" style="margin-right: 6px;"></i> Pay via UPI
+                </button>
+                <button type="button" id="showUpiReceiveBtn" class="btn" style="background: #3b82f6; color: white; margin-bottom: 10px; width: 100%; display: none;">
+                    <i class="fa-solid fa-qrcode" style="margin-right: 6px;"></i> Receive via QR
                 </button>
                 
                 <div id="upiPaymentSection" class="form-group" style="display: none; padding: 1rem; background: rgba(16, 185, 129, 0.1); border-radius: 8px; margin-bottom: 1rem; border: 1px solid rgba(16, 185, 129, 0.3);">
@@ -406,6 +426,21 @@
             <div style="display: flex; gap: 10px;">
                 <button id="verifyPaymentFailBtn" class="btn" style="flex: 1; background: #ef4444; color: white;">No, Failed</button>
                 <button id="verifyPaymentSuccessBtn" class="btn" style="flex: 1; background: #10b981; color: white;">Yes, Success</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Receive UPI QR -->
+    <div id="receiveQrModal" class="modal-overlay hidden" style="z-index: 1050;">
+        <div class="modal" style="text-align: center;">
+            <div class="modal-header">
+                <h2>Receive Payment</h2>
+                <button class="close-btn" data-close="receiveQrModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 2rem 1rem;">
+                <p style="color: var(--text-secondary); margin-bottom: 0.5rem;">Scan this QR code to pay <strong id="receiveQrAmountText"></strong></p>
+                <div id="receiveQrContainer" style="background: white; padding: 1rem; border-radius: 12px; box-shadow: var(--shadow-md);"></div>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 1rem;"><i class="fa-solid fa-circle-info"></i> Share this with the sender.</p>
             </div>
         </div>
     </div>

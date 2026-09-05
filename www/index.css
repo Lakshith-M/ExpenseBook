@@ -51,7 +51,7 @@ body {
     margin: 0 auto;
     min-height: 100vh;
     position: relative;
-    padding-bottom: 80px;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
     background-color: var(--bg-color);
     background-image: radial-gradient(circle at 50% -20%, rgba(59, 130, 246, 0.25) 0%, transparent 60%);
     background-repeat: no-repeat;
@@ -60,7 +60,7 @@ body {
 }
 
 .header {
-    padding: 24px 20px;
+    padding: calc(24px + env(safe-area-inset-top)) 20px 24px 20px;
     background: rgba(var(--bg-color-rgb, 11, 15, 25), 0.7);
     position: sticky;
     top: 0;

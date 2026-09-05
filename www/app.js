@@ -58,6 +58,12 @@ function applyTheme(theme) {
         document.documentElement.removeAttribute('data-theme');
         if(themeToggleBtn) themeToggleBtn.innerHTML = '<i class="fa-solid fa-moon" style="width: 20px;"></i> Toggle Theme';
     }
+    
+    // Update chart colors if it exists
+    if (expenseChartInstance && currentFilteredTransactions) {
+        renderChart(currentFilteredTransactions);
+    }
+}
 }
 
 if(themeToggleBtn) {
@@ -268,12 +274,19 @@ function updateUpiPayVisibility() {
     const isExpense = document.getElementById('typeExpense').checked;
     const isUpi = document.getElementById('methodUPI').checked;
     const showBtn = document.getElementById('showUpiPayBtn');
+    const receiveBtn = document.getElementById('showUpiReceiveBtn');
     const upiSection = document.getElementById('upiPaymentSection');
     
     if (isExpense && isUpi) {
         showBtn.style.display = 'block';
+        receiveBtn.style.display = 'none';
+    } else if (!isExpense && isUpi) {
+        showBtn.style.display = 'none';
+        receiveBtn.style.display = 'block';
+        upiSection.style.display = 'none';
     } else {
         showBtn.style.display = 'none';
+        receiveBtn.style.display = 'none';
         upiSection.style.display = 'none';
     }
 }
@@ -285,6 +298,36 @@ document.querySelectorAll('input[name="type"], input[name="paymentMethod"]').for
 document.getElementById('showUpiPayBtn').addEventListener('click', () => {
     document.getElementById('showUpiPayBtn').style.display = 'none';
     document.getElementById('upiPaymentSection').style.display = 'block';
+});
+
+document.getElementById('showUpiReceiveBtn').addEventListener('click', () => {
+    const amount = document.getElementById('amount').value;
+    if (!amount || amount <= 0) {
+        alert("Please enter a valid amount first.");
+        return;
+    }
+    
+    // Create UPI URI. Hardcode payee VPA or allow it to be set later?
+    // Since this is for the user to receive, we need their own VPA. 
+    // I will use a placeholder or prompt the user. Wait, if it's for them, maybe just generate standard UPI link with am?
+    // Let's use a dummy pa for now, but really they need to set their VPA in settings.
+    const myVpa = localStorage.getItem('my_upi_id') || 'lakshith@fam'; // Default fallback
+    const upiUri = `upi://pay?pa=${myVpa}&pn=ExpenseBookUser&am=${amount}&cu=INR`;
+    
+    document.getElementById('receiveQrAmountText').innerText = `₹${amount}`;
+    const qrContainer = document.getElementById('receiveQrContainer');
+    qrContainer.innerHTML = '';
+    
+    new QRCode(qrContainer, {
+        text: upiUri,
+        width: 200,
+        height: 200,
+        colorDark : "#000000",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.H
+    });
+    
+    openModal(document.getElementById('receiveQrModal'));
 });
 
 document.getElementById('initiateUpiPayBtn').addEventListener('click', () => {
@@ -548,7 +591,7 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
         document.getElementById('date').valueAsDate = new Date();
         closeModal(transactionModal);
         
-        const upiLink = `upi://pay?pa=${encodeURIComponent(receiverId)}&pn=Receiver&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(title || 'Payment')}&tr=${Date.now()}`;
+        const upiLink = `upi://pay?pa=${receiverId}&pn=Receiver&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(title || 'Payment')}&tr=${Date.now()}`;
         
         window.isAwaitingUpiReturn = true;
         window.location.href = upiLink;
@@ -778,16 +821,25 @@ function updateDashboard(filteredTransactions = null) {
         if (curr.type === 'income') {
             acc.income += curr.amount;
             acc.balance += curr.amount;
+            if (curr.paymentMethod === 'UPI') acc.upi += curr.amount;
+            if (curr.paymentMethod === 'Cash') acc.cash += curr.amount;
         } else {
             acc.expense += curr.amount;
             acc.balance -= curr.amount;
+            if (curr.paymentMethod === 'UPI') acc.upi -= curr.amount;
+            if (curr.paymentMethod === 'Cash') acc.cash -= curr.amount;
         }
         return acc;
-    }, { balance: 0, income: 0, expense: 0 });
+    }, { balance: 0, income: 0, expense: 0, upi: 0, cash: 0 });
 
     totalBalanceEl.innerText = formatCurrency(totals.balance);
     totalIncomeEl.innerText = formatCurrency(totals.income);
     totalExpenseEl.innerText = formatCurrency(totals.expense);
+    
+    const totalUpiEl = document.getElementById('totalUPI');
+    const totalCashEl = document.getElementById('totalCash');
+    if (totalUpiEl) totalUpiEl.innerText = formatCurrency(totals.upi);
+    if (totalCashEl) totalCashEl.innerText = formatCurrency(totals.cash);
 
     if (lastUpdated) {
         lastUpdatedEl.innerText = `Last updated on: ${lastUpdated}`;
@@ -1474,120 +1526,44 @@ document.getElementById('excelFileInput').addEventListener('change', async funct
 
             const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-            let headerRowIndex = -1;
-            let colMap = { date: -1, title: -1, withdrawal: -1, deposit: -1, amount: -1 };
-
-            for (let i = 0; i < Math.min(rows.length, 50); i++) {
-                const row = rows[i];
-                if (!row || !Array.isArray(row)) continue;
-
-                let foundDate = false;
-                let foundTitle = false;
-
-                row.forEach((cell, index) => {
-                    if (typeof cell !== 'string') return;
-                    const lower = cell.toLowerCase().trim();
-                    if (lower.includes('date')) { colMap.date = index; foundDate = true; }
-                    else if (lower.includes('narration') || lower.includes('description') || lower.includes('particulars') || lower === 'title') { colMap.title = index; foundTitle = true; }
-                    else if (lower.includes('withdrawal') || lower.includes('debit') || lower.includes('expense') || lower.includes('sent')) colMap.withdrawal = index;
-                    else if (lower.includes('deposit') || lower.includes('credit') || lower.includes('income') || lower.includes('received')) colMap.deposit = index;
-                    else if (lower.includes('amount')) colMap.amount = index;
-                });
-
-                if (foundDate && foundTitle) {
-                    headerRowIndex = i;
-                    break;
-                }
+            // Show loading state
+            const importSummaryMsg = document.getElementById('importSummaryMsg');
+            if (importSummaryMsg) {
+                importSummaryMsg.innerHTML = 'AI is reading the document... <div class="spinner"></div>';
+                openModal(document.getElementById('importSummaryModal'));
             }
 
-            if (headerRowIndex === -1) {
-                alert("Could not find the header row. Please ensure your file has columns for 'Date' and 'Narration' or 'Title'.");
-                return;
-            }
-
-            const parsedTxs = [];
-
-            for (let i = headerRowIndex + 1; i < rows.length; i++) {
-                const row = rows[i];
-                if (!row || row.length === 0) continue;
-
-                const dateStr = row[colMap.date];
-                const title = row[colMap.title];
-
-                if (!dateStr || !title) continue;
-
-                let withdrawal = colMap.withdrawal !== -1 ? parseFloat(row[colMap.withdrawal]) : NaN;
-                let deposit = colMap.deposit !== -1 ? parseFloat(row[colMap.deposit]) : NaN;
-
-                if (isNaN(withdrawal)) withdrawal = 0;
-                if (isNaN(deposit)) deposit = 0;
-
-                if (withdrawal === 0 && deposit === 0 && colMap.amount !== -1) {
-                    let amt = parseFloat(row[colMap.amount]);
-                    if (!isNaN(amt)) {
-                        if (amt < 0) { withdrawal = Math.abs(amt); }
-                        else { deposit = amt; }
-                    }
+            const rawText = rows.map(r => Array.isArray(r) ? r.join(', ') : '').join('\n');
+            const categories = Array.from(document.getElementById('category').options).map(opt => opt.value);
+            const baseUrl = window.location.hostname === 'localhost' && window.location.protocol === 'http:' 
+                ? 'https://expense-book-gamma.vercel.app' 
+                : window.location.origin;
+                
+            fetch(`${baseUrl}/api/parse-statement`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: rawText, categories })
+            })
+            .then(async res => {
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'AI parsing failed');
                 }
-
-                let parsedDate;
-                if (typeof dateStr === 'number') {
-                    let utcMs = Math.round((dateStr - 25569) * 86400 * 1000);
-                    let tempDate = new Date(utcMs);
-                    parsedDate = new Date(tempDate.getTime() + tempDate.getTimezoneOffset() * 60000);
+                return res.json();
+            })
+            .then(parsedTxs => {
+                if (importSummaryMsg) closeModal(document.getElementById('importSummaryModal'));
+                if (parsedTxs.length > 0) {
+                    processImportedTransactions(parsedTxs, file);
                 } else {
-                    let str = String(dateStr).trim();
-                    const parts = str.split(/[-/]/);
-                    if (parts.length === 3) {
-                        if (parts[0].length === 4) {
-                            let year = parseInt(parts[0]);
-                            let month = parseInt(parts[1]) - 1;
-                            let day = parseInt(parts[2]);
-                            parsedDate = new Date(year, month, day);
-                        } else if (!isNaN(parts[1])) {
-                            let day = parseInt(parts[0]);
-                            let month = parseInt(parts[1]) - 1;
-                            let year = parseInt(parts[2]);
-                            if (year < 100) year += 2000;
-                            parsedDate = new Date(year, month, day);
-                        } else {
-                            parsedDate = new Date(str);
-                        }
-                    } else {
-                        parsedDate = new Date(str);
-                    }
+                    alert("No valid transactions found in the Excel file.");
                 }
-
-                if (isNaN(parsedDate.getTime())) parsedDate = new Date();
-
-                const yearStr = parsedDate.getFullYear();
-                const monthStr = String(parsedDate.getMonth() + 1).padStart(2, '0');
-                const dayStr = String(parsedDate.getDate()).padStart(2, '0');
-                const isoDate = `${yearStr}-${monthStr}-${dayStr}`;
-
-                let type = 'expense';
-                let finalAmount = withdrawal || 0;
-                if (deposit && deposit > 0) {
-                    type = 'income';
-                    finalAmount = deposit;
-                }
-
-                if (finalAmount <= 0) continue;
-
-                parsedTxs.push({
-                    date: isoDate,
-                    title: String(title),
-                    amount: finalAmount,
-                    type: type,
-                    paymentMethod: 'UPI'
-                });
-            }
-
-            if (parsedTxs.length > 0) {
-                processImportedTransactions(parsedTxs, file);
-            } else {
-                alert("No valid transactions found in the Excel file.");
-            }
+            })
+            .catch(err => {
+                if (importSummaryMsg) closeModal(document.getElementById('importSummaryModal'));
+                console.error(err);
+                alert("Error parsing the Excel file: " + err.message);
+            });
         } catch (error) {
             console.error(error);
             alert("Error parsing the Excel file. Please ensure it is a valid format.");
@@ -1624,13 +1600,37 @@ async function parsePDFStatement(file) {
                     fullText += "\n\n--- PAGE BREAK ---\n\n";
                 }
                 
-                if (fullText.includes("ExpenseBook Statement")) {
-                    const txs = parseExpenseBookPDFText(fullText);
-                    resolve(txs);
-                } else {
-                    const txs = parseCanaraBankPDFText(fullText);
-                    resolve(txs);
+                // Show loading state
+                const importSummaryMsg = document.getElementById('importSummaryMsg');
+                if (importSummaryMsg) {
+                    importSummaryMsg.innerHTML = 'AI is reading the document... <div class="spinner"></div>';
+                    openModal(document.getElementById('importSummaryModal'));
                 }
+                
+                // Call AI endpoint
+                const categories = Array.from(document.getElementById('category').options).map(opt => opt.value);
+                const baseUrl = window.location.hostname === 'localhost' && window.location.protocol === 'http:' 
+                    ? 'https://expense-book-gamma.vercel.app' // Fallback for capacitor
+                    : window.location.origin;
+                    
+                const response = await fetch(`${baseUrl}/api/parse-statement`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: fullText, categories })
+                });
+                
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'AI parsing failed');
+                }
+                
+                const txs = await response.json();
+                
+                if (importSummaryMsg) {
+                    closeModal(document.getElementById('importSummaryModal'));
+                }
+                
+                resolve(txs);
             } catch (err) {
                 reject(err);
             }

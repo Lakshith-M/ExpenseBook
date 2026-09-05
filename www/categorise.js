@@ -28,7 +28,11 @@ export async function getCategory(text) {
     }
 
     // Send request to our own Vercel backend
-    const response = await fetch('/api/categorise', {
+    const baseUrl = window.location.hostname === 'localhost' && window.location.protocol === 'http:' 
+        ? 'https://expense-book-gamma.vercel.app' // Fallback for capacitor
+        : window.location.origin;
+
+    const response = await fetch(`${baseUrl}/api/categorise`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
