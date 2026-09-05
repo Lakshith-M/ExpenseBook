@@ -1,12 +1,1 @@
-for INcome + UPI , i want to be able to add an amount, title , AI categorises it and then there shd be a 
-button for me to click which shows a QR code for accepting payments into my acct, i want to make the QR 
-in a way that a person scanning it must automatically be able to pay instead of typing their own amount. 
-Tell me if this is possible. 
-
-I also want the AI feature for import  bank statements, currently the app works for only certain formatting, 
-but i want to make it generalised for all banks. So the AI must read the pdf  or xls and then return all the
-details to the app and then the app must add all of those txns.
-
-Along with the Total balance, income , expense, i also want UPI and Cash over there. 
-So i can pitch that this app is an app which can be used to manage my daily expense and income. 
-Make sure u dont break any UI by doing these. Keep the UI same for these features as well. 
+I 

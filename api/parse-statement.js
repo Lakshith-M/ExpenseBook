@@ -95,11 +95,21 @@ ${text.substring(0, 10000)}
     
     let rawContent = result.choices[0]?.message?.content?.trim() || '[]';
     
-    // Strip markdown code block if model ignored instructions
+    // Strip <think>...</think> blocks from reasoning models (qwen, etc.)
+    rawContent = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+    // Strip markdown code block if model wrapped output
     if (rawContent.startsWith('```')) {
-      rawContent = rawContent.replace(/^```(json)?/, '').replace(/```$/, '').trim();
+      rawContent = rawContent.replace(/^```(json)?/i, '').replace(/```[\s\S]*$/, '').trim();
     }
-    
+
+    // Find the first '[' and last ']' — extract raw JSON array even if there's preamble text
+    const arrStart = rawContent.indexOf('[');
+    const arrEnd = rawContent.lastIndexOf(']');
+    if (arrStart !== -1 && arrEnd !== -1 && arrEnd > arrStart) {
+      rawContent = rawContent.substring(arrStart, arrEnd + 1);
+    }
+
     // Extract array if it was wrapped in an object like {"transactions": [...]}
     let parsedTxs = [];
     try {
@@ -115,8 +125,8 @@ ${text.substring(0, 10000)}
         }
       }
     } catch (parseError) {
-      console.error("Failed to parse Groq response:", rawContent);
-      return res.status(500).json({ error: "Failed to parse AI output as JSON" });
+      console.error("Failed to parse Groq response:", rawContent.substring(0, 500));
+      return res.status(500).json({ error: "Failed to parse AI output as JSON. The AI may have returned an unexpected format." });
     }
     
     // Clean and validate categories against the allowed list
