@@ -1740,8 +1740,16 @@ async function parseExcelStatement(file, instructions) {
                     body: JSON.stringify({ text: rawText, categories: cats, instructions })
                 });
                 if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || 'AI parsing failed');
+                    let errMessage = 'AI parsing failed (Server Error)';
+                    try {
+                        const err = await res.json();
+                        errMessage = err.error || errMessage;
+                    } catch (e) {
+                        const text = await res.text();
+                        console.error("Non-JSON error response:", text.substring(0, 200));
+                        if (res.status === 504) errMessage = 'Request timed out. The AI took too long to respond.';
+                    }
+                    throw new Error(errMessage);
                 }
                 resolve(await res.json());
             } catch(err) { reject(err); }
@@ -1796,8 +1804,16 @@ async function parsePDFStatement(file, password, instructions) {
                 });
                 
                 if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.error || 'AI parsing failed');
+                    let errMessage = 'AI parsing failed (Server Error)';
+                    try {
+                        const err = await response.json();
+                        errMessage = err.error || errMessage;
+                    } catch (e) {
+                        const text = await response.text();
+                        console.error("Non-JSON error response:", text.substring(0, 200));
+                        if (response.status === 504) errMessage = 'Request timed out. The AI took too long to respond.';
+                    }
+                    throw new Error(errMessage);
                 }
                 
                 resolve(await response.json());
