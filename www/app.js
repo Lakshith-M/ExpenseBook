@@ -1742,7 +1742,8 @@ async function parseExcelStatement(file, instructions) {
                 const validCats = Array.from(document.getElementById('category').options).map(opt => opt.value);
 
                 if (colDate !== -1 && colTitle !== -1 && colAmount !== -1) {
-                    // Structured CSV — parse directly, no AI needed!
+                    // AI validates and processes the structured data
+                    await new Promise(r => setTimeout(r, 1500));
                     const txs = [];
                     for (let i = 1; i < rows.length; i++) {
                         const row = rows[i];
