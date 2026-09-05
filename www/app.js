@@ -114,7 +114,7 @@ function init() {
     }
     
     // Populate categories
-    categories = JSON.parse(localStorage.getItem('expensebook_categories')) || ['Food', 'Personal', 'Transport', 'Utilities', 'Entertainment', 'Salary'];
+    categories = JSON.parse(localStorage.getItem('expensebook_categories')) || ['Food', 'Personal', 'Transport', 'Utilities', 'Entertainment', 'Salary', 'Undefined'];
     if (!localStorage.getItem('expensebook_categories')) {
         localStorage.setItem('expensebook_categories', JSON.stringify(categories));
     }
@@ -420,7 +420,7 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
 document.getElementById('autoAssignBtn').addEventListener('click', async () => {
     const rawTitle = document.getElementById('title').value.trim();
     if (!rawTitle) {
-        alert('Please enter a title before requesting AI suggestion.');
+        // No alert, just return silently if empty, so blur event doesn't annoy user
         return;
     }
     const spinner = document.getElementById('categorySpinner');
@@ -434,6 +434,14 @@ document.getElementById('autoAssignBtn').addEventListener('click', async () => {
         console.error('Category suggestion failed', err);
     } finally {
         spinner.classList.add('hidden');
+    }
+});
+
+// Auto trigger category assignment on blur
+document.getElementById('title').addEventListener('blur', () => {
+    const rawTitle = document.getElementById('title').value.trim();
+    if (rawTitle) {
+        document.getElementById('autoAssignBtn').click();
     }
 });
 

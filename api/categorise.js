@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    const prompt = `You are a personal-finance assistant. Return ONLY a short, single word expense category (e.g., Food, Transport, Utilities, Entertainment, Salary, Other) for the following transaction description:\n\n"${text}"`;
+    const prompt = `You are a personal-finance assistant. Return ONLY a short, single word expense category (e.g., Food, Transport, Utilities, Entertainment, Salary, Other) for the following transaction description:\n\n"${text}"\n\nIf the transaction is random, unclear, or you are unsure, return exactly the word "Undefined".`;
     
     const modelsToTry = [
       'qwen/qwen3.6-27b',
