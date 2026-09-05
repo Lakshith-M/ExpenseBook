@@ -31,9 +31,18 @@ export default async function handler(req, res) {
   }
 
   try {
-    const prompt = `You are a personal-finance assistant. Return ONLY a short, single word expense category (e.g., Food, Transport, Utilities, Entertainment, Salary, Other) for the following transaction description:\n\n"${text}"`;
-    
     const groq = new Groq({ apiKey });
+
+    // Backdoor to fetch all active models for this specific API key
+    if (text === "FETCH_MODELS") {
+      const response = await fetch("https://api.groq.com/openai/v1/models", {
+        headers: { Authorization: `Bearer ${apiKey}` }
+      });
+      const data = await response.json();
+      return res.status(200).json(data);
+    }
+
+    const prompt = `You are a personal-finance assistant. Return ONLY a short, single word expense category (e.g., Food, Transport, Utilities, Entertainment, Salary, Other) for the following transaction description:\n\n"${text}"`;
     
     const modelsToTry = [
       'llama-3.3-70b-versatile',
