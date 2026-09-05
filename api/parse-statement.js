@@ -62,10 +62,15 @@ Raw Text:
 ${text.substring(0, 10000)}
 """`;
 
-    // Try a very capable model for JSON extraction
+    // Try models in order — same list as categorise.js
     const modelsToTry = [
+      'qwen/qwen3.6-27b',
+      'openai/gpt-oss-20b',
+      'allam-2-7b',
       'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant'
+      'llama-3.1-8b-instant',
+      'llama3-70b-8192',
+      'mixtral-8x7b-32768'
     ];
     
     let result;
