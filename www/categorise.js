@@ -16,13 +16,23 @@ export async function getCategory(text) {
   };
 
   try {
+    // Fetch active categories from local storage to guide the AI
+    let activeCategories = [];
+    try {
+        const stored = localStorage.getItem('expensebook_categories');
+        if (stored) activeCategories = JSON.parse(stored);
+    } catch(e) {}
+    if (activeCategories.length === 0) {
+        activeCategories = ['Food', 'Personal', 'Transport', 'Utilities', 'Entertainment', 'Salary', 'Undefined'];
+    }
+
     // Send request to our own Vercel backend
     const response = await fetch('/api/categorise', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, categories: activeCategories }),
     });
     
     if (!response.ok) {

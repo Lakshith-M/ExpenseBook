@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { text } = req.body;
+  const { text, categories } = req.body;
   if (!text) {
     return res.status(400).json({ error: 'Missing text in request body' });
   }
@@ -42,7 +42,11 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    const prompt = `You are a personal-finance assistant. Return ONLY a short, single word expense category (e.g., Food, Transport, Utilities, Entertainment, Salary, Other) for the following transaction description:\n\n"${text}"\n\nIf the transaction is random, unclear, or you are unsure, return exactly the word "Undefined".`;
+    const availableCategoriesStr = Array.isArray(categories) && categories.length > 0 
+        ? categories.join(', ') 
+        : 'Food, Transport, Utilities, Entertainment, Salary, Undefined';
+
+    const prompt = `You are a personal-finance assistant. Return ONLY a short, single word expense category for the following transaction description:\n\n"${text}"\n\nYou MUST choose exactly one category from this exact list: ${availableCategoriesStr}\n\nIf the transaction is random, unclear, or you are unsure, return exactly the word "Undefined".`;
     
     const modelsToTry = [
       'qwen/qwen3.6-27b',
