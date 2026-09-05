@@ -64,7 +64,6 @@ function applyTheme(theme) {
         renderChart(currentFilteredTransactions);
     }
 }
-}
 
 if(themeToggleBtn) {
     themeToggleBtn.addEventListener('click', () => {
@@ -1642,7 +1641,7 @@ async function parsePDFStatement(file) {
 function parseExpenseBookPDFText(fullText) {
     const parsedTxs = [];
     const lines = fullText.split('\n');
-    const txRegex = /^\s*(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})\s+(.*?)\s+(Income|Expense)\s+([+-]\s*(?:Rs\.|₹|INR)?\s*([\d,]+\.\d{2}))/i;
+    const txRegex = /^\s*(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})\s+(.*?)\s+(Income|Expense)\s+([+-]\s*(?:Rs\.|\u20B9|INR)?\s*([\d,]+\.\d{2}))/i;
     
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -1710,7 +1709,7 @@ function parseCanaraBankPDFText(fullText) {
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         if (line.toLowerCase().includes('opening balance')) {
-            const amounts = line.match(/(?:Rs\.|₹|INR)?\s*[\d,]+\.\d{2}/gi);
+            const amounts = line.match(/(?:Rs\.|\u20B9|INR)?\s*[\d,]+\.\d{2}/gi);
             if (amounts && amounts.length > 0) {
                 lastRunningBalance = parseFloat(amounts[amounts.length - 1].replace(/[^0-9.]/g, ''));
                 break;
@@ -1763,7 +1762,7 @@ function parseCanaraBankPDFText(fullText) {
         }
 
         if (currentTx) {
-            const amounts = line.match(/(?:Rs\.|₹|INR)?\s*[\d,]+\.\d{2}/gi);
+            const amounts = line.match(/(?:Rs\.|\u20B9|INR)?\s*[\d,]+\.\d{2}/gi);
             if (amounts && amounts.length >= 2 && !line.includes('Balance')) {
                 const txAmtStr = amounts[amounts.length - 2].replace(/[^0-9.]/g, '');
                 currentTx.amount = parseFloat(txAmtStr);
