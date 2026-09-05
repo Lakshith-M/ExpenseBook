@@ -140,6 +140,72 @@ function sortTransactions() {
     });
 }
 
+// UPI Payment Verification Return Handler
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && window.isAwaitingUpiReturn && window.pendingUpiTx) {
+        window.isAwaitingUpiReturn = false;
+        // Show verification modal
+        const verifyModal = document.getElementById('paymentVerifyModal');
+        verifyModal.classList.remove('hidden');
+    }
+});
+
+document.getElementById('verifyPaymentSuccessBtn').addEventListener('click', () => {
+    document.getElementById('paymentVerifyModal').classList.add('hidden');
+    if (window.pendingUpiTx) {
+        const tx = window.pendingUpiTx;
+        transactions.push(tx);
+        localStorage.setItem('expensebook_transactions', JSON.stringify(transactions));
+        sortTransactions();
+        lastUpdated = new Date().toLocaleString();
+        if (lastUpdatedEl) lastUpdatedEl.innerText = `Last updated on: ${lastUpdated}`;
+        updateDashboard();
+        renderTransactions();
+        window.pendingUpiTx = null;
+    }
+});
+
+document.getElementById('verifyPaymentFailBtn').addEventListener('click', () => {
+    document.getElementById('paymentVerifyModal').classList.add('hidden');
+    window.pendingUpiTx = null;
+});
+
+// QR Scanner Logic
+let html5QrcodeScanner = null;
+
+document.getElementById('scanQrBtn').addEventListener('click', () => {
+    document.getElementById('qrScannerModal').classList.remove('hidden');
+    if (!html5QrcodeScanner) {
+        // Must use 'Html5QrcodeScanner' from the global scope injected by script tag
+        html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
+        html5QrcodeScanner.render((decodedText) => {
+            // Parse UPI link or raw string
+            let pa = decodedText;
+            if (decodedText.toLowerCase().startsWith('upi://')) {
+                try {
+                    const url = new URL(decodedText);
+                    pa = url.searchParams.get('pa') || decodedText;
+                } catch(e) {}
+            }
+            document.getElementById('receiverUpiId').value = pa;
+            
+            // Stop scanning and close
+            html5QrcodeScanner.clear().catch(e => console.error(e));
+            document.getElementById('qrScannerModal').classList.add('hidden');
+            html5QrcodeScanner = null;
+        }, (error) => {
+            // Ignore scan errors as they fire continuously until a code is found
+        });
+    }
+});
+
+document.getElementById('closeQrScannerBtn').addEventListener('click', () => {
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.clear().catch(e => console.error(e));
+        html5QrcodeScanner = null;
+    }
+});
+
 // Event Listeners
 document.getElementById('fabBtn').addEventListener('click', () => {
     document.getElementById('transactionForm').reset();
@@ -186,21 +252,17 @@ document.getElementById('showUpiPayBtn').addEventListener('click', () => {
 document.getElementById('initiateUpiPayBtn').addEventListener('click', () => {
     const receiverId = document.getElementById('receiverUpiId').value.trim();
     const amount = document.getElementById('amount').value;
-    const title = document.getElementById('title').value;
     
     if (!receiverId || !amount) {
         alert("Please enter both Amount and Receiver UPI ID/Number.");
         return;
     }
     
-    // Save transaction first
+    // Flag that we are doing a UPI payment flow
+    window.isUpiPayFlow = true;
+    
+    // Trigger standard form save (which handles AI category etc)
     document.getElementById('saveTxnBtn').click();
-    
-    // Construct UPI intent
-    const upiLink = `upi://pay?pa=${encodeURIComponent(receiverId)}&pn=Receiver&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(title || 'Payment')}`;
-    
-    // Redirect to UPI app
-    window.location.href = upiLink;
 });
 document.getElementById('importExcelBtn').addEventListener('click', () => {
     document.getElementById('excelFileInput').click();
@@ -435,6 +497,23 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
         aiSuggested: !!(suggestion && suggestion.category),
         catScore: suggestion ? suggestion.confidence : null
     };
+
+    if (window.isUpiPayFlow) {
+        window.isUpiPayFlow = false;
+        window.pendingUpiTx = tx;
+        
+        e.target.reset();
+        document.getElementById('txId').value = '';
+        document.getElementById('date').valueAsDate = new Date();
+        closeModal(transactionModal);
+        
+        const receiverId = document.getElementById('receiverUpiId').value.trim();
+        const upiLink = `upi://pay?pa=${encodeURIComponent(receiverId)}&pn=Receiver&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(title || 'Payment')}`;
+        
+        window.isAwaitingUpiReturn = true;
+        window.location.href = upiLink;
+        return;
+    }
 
     // Save for next time
     lastAddedTx = { type, paymentMethod, title, category };
