@@ -1716,7 +1716,7 @@ function showImportPreview(parsedTxs, fileObj) {
     openModal(document.getElementById('importPreviewModal'));
 }
 
-// ── Parse Excel via AI ──────────────────────────────────────────────────────
+// ── Parse Excel/CSV — smart: direct parse if structured, AI if not ──────────
 async function parseExcelStatement(file, instructions) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -1726,10 +1726,85 @@ async function parseExcelStatement(file, instructions) {
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
-                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                const rawText = rows.map(r => Array.isArray(r) ? r.join(', ') : '').join('\n');
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
 
-                const cats = Array.from(document.getElementById('category').options).map(opt => opt.value);
+                if (rows.length < 2) { resolve([]); return; }
+
+                // ── Try direct structured parse first ──
+                const header = rows[0].map(h => String(h).toLowerCase().trim());
+                const colDate   = header.findIndex(h => /date/.test(h));
+                const colTitle  = header.findIndex(h => /desc|title|narr|particular|name/.test(h));
+                const colAmount = header.findIndex(h => /amount|amt|debit|credit/.test(h));
+                const colType   = header.findIndex(h => /type|kind/.test(h));
+                const colMethod = header.findIndex(h => /method|payment|mode|channel/.test(h));
+                const colCat    = header.findIndex(h => /categ/.test(h));
+
+                const validCats = Array.from(document.getElementById('category').options).map(opt => opt.value);
+
+                if (colDate !== -1 && colTitle !== -1 && colAmount !== -1) {
+                    // Structured CSV — parse directly, no AI needed!
+                    const txs = [];
+                    for (let i = 1; i < rows.length; i++) {
+                        const row = rows[i];
+                        const rawDate = row[colDate];
+                        const rawTitle = row[colTitle];
+                        const rawAmount = row[colAmount];
+                        if (!rawTitle || !rawAmount) continue;
+
+                        // Parse date
+                        let date = '';
+                        try {
+                            const d = new Date(rawDate);
+                            if (!isNaN(d)) date = d.toISOString().split('T')[0];
+                        } catch {}
+
+                        // Parse amount
+                        const amount = parseFloat(String(rawAmount).replace(/[^0-9.]/g, '')) || 0;
+                        if (amount === 0) continue;
+
+                        // Type
+                        let type = 'expense';
+                        if (colType !== -1) {
+                            const t = String(row[colType]).toLowerCase();
+                            if (t.includes('income') || t.includes('credit')) type = 'income';
+                        }
+
+                        // Method
+                        let method = 'Bank';
+                        if (colMethod !== -1) {
+                            const m = String(row[colMethod]).toLowerCase();
+                            if (m.includes('upi')) method = 'UPI';
+                            else if (m.includes('cash')) method = 'Cash';
+                        }
+
+                        // Category
+                        let category = 'Undefined';
+                        if (colCat !== -1) {
+                            const c = String(row[colCat]).trim();
+                            const match = validCats.find(v => v.toLowerCase() === c.toLowerCase());
+                            category = match || 'Undefined';
+                        }
+
+                        txs.push({ date, title: String(rawTitle).trim(), amount, type, paymentMethod: method, category });
+                    }
+
+                    // Apply instructions filter if any (e.g. "last 4")
+                    if (instructions) {
+                        const lastN = instructions.match(/last\s+(\d+)/i);
+                        if (lastN) {
+                            const n = parseInt(lastN[1]);
+                            resolve(txs.slice(-n));
+                            return;
+                        }
+                    }
+
+                    resolve(txs);
+                    return;
+                }
+
+                // ── Fallback: send to AI for unstructured files ──
+                const rawText = rows.map(r => Array.isArray(r) ? r.join(', ') : '').join('\n');
+                const cats = validCats;
                 const baseUrl = window.location.hostname === 'localhost' && window.location.protocol === 'http:'
                     ? 'https://expense-book-gamma.vercel.app'
                     : window.location.origin;
@@ -1753,6 +1828,7 @@ async function parseExcelStatement(file, instructions) {
                 }
                 resolve(await res.json());
             } catch(err) { reject(err); }
+
         };
         reader.readAsArrayBuffer(file);
     });

@@ -1,0 +1,51 @@
+Date,Description,Type,Amount,Payment Method,Category
+2024-08-15,Salary Credit,Income,5000,Bank,Salary
+2024-08-15,Starbucks Coffee,Expense,350,Cash,Food
+2024-08-16,Uber Ride,Expense,420,UPI,Transport
+2024-08-16,Amazon Shopping,Expense,1250,UPI,Shopping
+2024-08-17,Netflix Subscription,Expense,649,UPI,Entertainment
+2024-08-17,Freelance Payment,Income,3500,Bank,Salary
+2024-08-18,Electricity Bill,Expense,1850,Bank,Utilities
+2024-08-18,Zomato Order,Expense,480,UPI,Food
+2024-08-19,Tea Stall,Expense,100,Cash,Food
+2024-08-19,Metro Card Recharge,Expense,500,UPI,Transport
+2024-08-20,Jio Mobile Recharge,Expense,299,UPI,Utilities
+2024-08-20,BookMyShow Tickets,Expense,850,UPI,Entertainment
+2024-08-21,Pharmacy,Expense,620,Cash,Health
+2024-08-21,Swiggy Instamart,Expense,750,UPI,Food
+2024-08-22,Ola Cab,Expense,380,UPI,Transport
+2024-08-22,Cashback Received,Income,250,UPI,Salary
+2024-08-23,Myntra Clothing,Expense,2400,UPI,Shopping
+2024-08-23,Water Bill,Expense,450,Bank,Utilities
+2024-08-24,Spotify Premium,Expense,119,UPI,Entertainment
+2024-08-24,Gym Membership,Expense,1500,Cash,Health
+2024-08-25,Dominos Pizza,Expense,680,UPI,Food
+2024-08-25,Freelance Bonus,Income,2000,Bank,Salary
+2024-08-26,Blinkit Groceries,Expense,920,Cash,Food
+2024-08-26,Local Train Ticket,Expense,150,Cash,Transport
+2024-08-27,Flipkart Sale,Expense,3200,UPI,Shopping
+2024-08-27,Wifi Broadband,Expense,999,Bank,Utilities
+2024-08-28,Concert Tickets,Expense,1200,UPI,Entertainment
+2024-08-28,Doctor Consultation,Expense,800,UPI,Health
+2024-08-29,BigBasket,Expense,1800,Cash,Food
+2024-08-29,Rapido Bike,Expense,120,UPI,Transport
+2024-08-30,Part-time Work,Income,1800,Bank,Salary
+2024-08-30,Decathlon Sports,Expense,2150,UPI,Shopping
+2024-08-31,Gas Cylinder,Expense,900,Bank,Utilities
+2024-08-31,Prime Video,Expense,1499,UPI,Entertainment
+2024-09-01,McDonalds,Expense,450,Cash,Food
+2024-09-01,Auto Rickshaw,Expense,200,Cash,Transport
+2024-09-01,Salary Credit,Income,5000,Bank,Salary
+2024-09-02,Ajio Fashion,Expense,1750,UPI,Shopping
+2024-09-02,DTH Recharge,Expense,350,UPI,Utilities
+2024-09-02,Dental Checkup,Expense,1200,Cash,Health
+2024-09-03,KFC Order,Expense,550,UPI,Food
+2024-09-03,Bus Ticket,Expense,80,Cash,Transport
+2024-09-03,Referral Bonus,Income,500,UPI,Salary
+2024-09-04,IKEA Home Decor,Expense,3800,UPI,Shopping
+2024-09-04,Maintenance Charge,Expense,2000,Bank,Utilities
+2024-09-04,Youtube Premium,Expense,129,UPI,Entertainment
+2024-09-05,Medicine Refill,Expense,340,UPI,Health
+2024-09-05,Zepto Groceries,Expense,650,UPI,Food
+2024-09-05,Tuition Income,Income,1500,Bank,Salary
+2024-09-05,Chai Point,Expense,120,Cash,Food
