@@ -157,6 +157,50 @@ document.getElementById('fabBtn').addEventListener('click', () => {
     // }
     
     openModal(transactionModal);
+    updateUpiPayVisibility();
+});
+
+function updateUpiPayVisibility() {
+    const isExpense = document.getElementById('typeExpense').checked;
+    const isUpi = document.getElementById('methodUPI').checked;
+    const showBtn = document.getElementById('showUpiPayBtn');
+    const upiSection = document.getElementById('upiPaymentSection');
+    
+    if (isExpense && isUpi) {
+        showBtn.style.display = 'block';
+    } else {
+        showBtn.style.display = 'none';
+        upiSection.style.display = 'none';
+    }
+}
+
+document.querySelectorAll('input[name="type"], input[name="paymentMethod"]').forEach(el => {
+    el.addEventListener('change', updateUpiPayVisibility);
+});
+
+document.getElementById('showUpiPayBtn').addEventListener('click', () => {
+    document.getElementById('showUpiPayBtn').style.display = 'none';
+    document.getElementById('upiPaymentSection').style.display = 'block';
+});
+
+document.getElementById('initiateUpiPayBtn').addEventListener('click', () => {
+    const receiverId = document.getElementById('receiverUpiId').value.trim();
+    const amount = document.getElementById('amount').value;
+    const title = document.getElementById('title').value;
+    
+    if (!receiverId || !amount) {
+        alert("Please enter both Amount and Receiver UPI ID/Number.");
+        return;
+    }
+    
+    // Save transaction first
+    document.getElementById('saveTxnBtn').click();
+    
+    // Construct UPI intent
+    const upiLink = `upi://pay?pa=${encodeURIComponent(receiverId)}&pn=Receiver&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(title || 'Payment')}`;
+    
+    // Redirect to UPI app
+    window.location.href = upiLink;
 });
 document.getElementById('importExcelBtn').addEventListener('click', () => {
     document.getElementById('excelFileInput').click();

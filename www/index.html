@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="index.css?v=20">
+    <link rel="stylesheet" href="index.css?v=21">
     <!-- Chart.js for Analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- jsPDF for Excel-style Export -->
@@ -235,7 +235,18 @@
                     <label>Date</label>
                     <input type="date" id="date" required>
                 </div>
-                <button type="submit" class="btn primary-btn">Save Transaction</button>
+                
+                <button type="button" id="showUpiPayBtn" class="btn" style="background: #10b981; color: white; margin-bottom: 10px; width: 100%; display: none;">
+                    <i class="fa-solid fa-qrcode" style="margin-right: 6px;"></i> Pay via UPI
+                </button>
+                
+                <div id="upiPaymentSection" class="form-group" style="display: none; padding: 1rem; background: rgba(16, 185, 129, 0.1); border-radius: 8px; margin-bottom: 1rem; border: 1px solid rgba(16, 185, 129, 0.3);">
+                    <label style="color: #10b981;">Receiver UPI ID or Number</label>
+                    <input type="text" id="receiverUpiId" placeholder="e.g. merchant@upi or 9999999999" style="margin-bottom: 10px;">
+                    <button type="button" id="initiateUpiPayBtn" class="btn" style="background: #10b981; color: white; width: 100%;">Proceed to Pay & Save</button>
+                </div>
+
+                <button type="submit" class="btn primary-btn" id="saveTxnBtn">Save Transaction</button>
             </form>
         </div>
     </div>
@@ -365,8 +376,8 @@
     </div>
     </div>
 
-    <script type="module" src="categorise.js?v=20"></script>
-    <script type="module" src="app.js?v=20"></script>
+    <script type="module" src="categorise.js?v=21"></script>
+    <script type="module" src="app.js?v=21"></script>
 </body>
 
 </html>
