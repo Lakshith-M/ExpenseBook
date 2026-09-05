@@ -417,12 +417,10 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
 });
 
 // Add Category Form
-document.getElementById('autoAssignBtn').addEventListener('click', async () => {
+async function autoAssignCategory() {
     const rawTitle = document.getElementById('title').value.trim();
-    if (!rawTitle) {
-        // No alert, just return silently if empty, so blur event doesn't annoy user
-        return;
-    }
+    if (!rawTitle) return;
+    
     const spinner = document.getElementById('categorySpinner');
     spinner.classList.remove('hidden');
     try {
@@ -435,14 +433,14 @@ document.getElementById('autoAssignBtn').addEventListener('click', async () => {
     } finally {
         spinner.classList.add('hidden');
     }
-});
+}
 
-// Auto trigger category assignment on blur
-document.getElementById('title').addEventListener('blur', () => {
-    const rawTitle = document.getElementById('title').value.trim();
-    if (rawTitle) {
-        document.getElementById('autoAssignBtn').click();
-    }
+let titleDebounceTimer;
+document.getElementById('title').addEventListener('input', () => {
+    clearTimeout(titleDebounceTimer);
+    titleDebounceTimer = setTimeout(() => {
+        autoAssignCategory();
+    }, 1000); // 1 second debounce
 });
 
 
