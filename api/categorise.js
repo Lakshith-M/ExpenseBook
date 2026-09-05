@@ -45,10 +45,11 @@ export default async function handler(req, res) {
     const prompt = `You are a personal-finance assistant. Return ONLY a short, single word expense category (e.g., Food, Transport, Utilities, Entertainment, Salary, Other) for the following transaction description:\n\n"${text}"`;
     
     const modelsToTry = [
+      'qwen/qwen3.6-27b',
+      'openai/gpt-oss-20b',
+      'allam-2-7b',
       'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant',
-      'gemma2-9b-it',
-      'mixtral-8x7b-32768'
+      'llama-3.1-8b-instant'
     ];
     
     let result;
