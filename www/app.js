@@ -114,10 +114,11 @@ function init() {
     }
     
     // Populate categories
-    categories = JSON.parse(localStorage.getItem('expensebook_categories')) || ['Food', 'Personal', 'Transport', 'Utilities', 'Entertainment', 'Salary', 'Undefined'];
-    if (!localStorage.getItem('expensebook_categories')) {
-        localStorage.setItem('expensebook_categories', JSON.stringify(categories));
+    categories = JSON.parse(localStorage.getItem('expensebook_categories')) || ['Food', 'Personal', 'Transport', 'Utilities', 'Entertainment', 'Salary'];
+    if (!categories.includes('Undefined')) {
+        categories.push('Undefined');
     }
+    localStorage.setItem('expensebook_categories', JSON.stringify(categories));
 
     populateCategoryDropdowns();
     renderCategoryList();
