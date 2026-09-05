@@ -301,33 +301,115 @@ document.getElementById('showUpiPayBtn').addEventListener('click', () => {
 
 document.getElementById('showUpiReceiveBtn').addEventListener('click', () => {
     const amount = document.getElementById('amount').value;
-    if (!amount || amount <= 0) {
+    if (!amount || parseFloat(amount) <= 0) {
         alert("Please enter a valid amount first.");
         return;
     }
-    
-    // Create UPI URI. Hardcode payee VPA or allow it to be set later?
-    // Since this is for the user to receive, we need their own VPA. 
-    // I will use a placeholder or prompt the user. Wait, if it's for them, maybe just generate standard UPI link with am?
-    // Let's use a dummy pa for now, but really they need to set their VPA in settings.
-    const myVpa = localStorage.getItem('my_upi_id') || 'lakshith@fam'; // Default fallback
-    const upiUri = `upi://pay?pa=${myVpa}&pn=ExpenseBookUser&am=${amount}&cu=INR`;
-    
+    openSelectUpiIdModal(parseFloat(amount));
+});
+
+// ── My UPI IDs ──────────────────────────────────────────────────────────────
+let myUpiIds = JSON.parse(localStorage.getItem('expensebook_upi_ids') || '[]');
+
+function saveUpiIds() {
+    localStorage.setItem('expensebook_upi_ids', JSON.stringify(myUpiIds));
+}
+
+function renderUpiIdsList() {
+    const list = document.getElementById('upiIdsList');
+    list.innerHTML = '';
+    if (myUpiIds.length === 0) {
+        list.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 0.5rem;">No UPI IDs added yet.</p>';
+        return;
+    }
+    myUpiIds.forEach((id, idx) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; align-items:center; gap:0.5rem; background: var(--surface-alt, rgba(255,255,255,0.05)); border-radius:8px; padding:0.75rem 1rem; border:1px solid var(--border);';
+        row.innerHTML = `
+            <i class="fa-solid fa-qrcode" style="color: var(--primary); font-size: 1.1rem;"></i>
+            <span style="flex:1; font-size:0.95rem;">${id}</span>
+            <button data-idx="${idx}" class="delete-upi-btn" style="background:rgba(239,68,68,0.1); border:none; color:#ef4444; border-radius:6px; padding:0.3rem 0.6rem; cursor:pointer;"><i class="fa-solid fa-trash-can"></i></button>
+        `;
+        list.appendChild(row);
+    });
+    list.querySelectorAll('.delete-upi-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            myUpiIds.splice(parseInt(btn.dataset.idx), 1);
+            saveUpiIds();
+            renderUpiIdsList();
+        });
+    });
+}
+
+document.getElementById('addUpiIdBtn').addEventListener('click', () => {
+    const input = document.getElementById('newUpiIdInput');
+    const val = input.value.trim();
+    if (!val) { alert('Please enter a UPI ID.'); return; }
+    if (myUpiIds.includes(val)) { alert('This UPI ID is already saved.'); return; }
+    myUpiIds.push(val);
+    saveUpiIds();
+    input.value = '';
+    renderUpiIdsList();
+});
+
+document.getElementById('newUpiIdInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('addUpiIdBtn').click();
+});
+
+document.getElementById('manageUpiIdsBtn').addEventListener('click', () => {
+    document.getElementById('menuDropdown').classList.add('hidden');
+    renderUpiIdsList();
+    openModal(document.getElementById('upiIdsModal'));
+});
+
+// ── Select UPI ID → Generate QR ────────────────────────────────────────────
+function openSelectUpiIdModal(amount) {
+    const list = document.getElementById('selectUpiIdList');
+    const empty = document.getElementById('selectUpiIdEmpty');
+    list.innerHTML = '';
+
+    if (myUpiIds.length === 0) {
+        list.style.display = 'none';
+        empty.style.display = 'block';
+    } else {
+        empty.style.display = 'none';
+        list.style.display = 'flex';
+        myUpiIds.forEach(id => {
+            const btn = document.createElement('button');
+            btn.className = 'btn';
+            btn.style.cssText = 'background: var(--surface-alt, rgba(255,255,255,0.05)); color: var(--text-primary); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 1rem; text-align: left; display: flex; align-items: center; gap: 0.75rem; font-size: 0.95rem; cursor: pointer; transition: border-color 0.2s, background 0.2s;';
+            btn.innerHTML = `<i class="fa-solid fa-qrcode" style="color: var(--primary);"></i> <span>${id}</span>`;
+            btn.addEventListener('mouseover', () => { btn.style.borderColor = 'var(--primary)'; btn.style.background = 'rgba(59,130,246,0.1)'; });
+            btn.addEventListener('mouseout', () => { btn.style.borderColor = 'var(--border)'; btn.style.background = 'var(--surface-alt, rgba(255,255,255,0.05))'; });
+            btn.addEventListener('click', () => {
+                closeModal(document.getElementById('selectUpiIdModal'));
+                generateReceiveQR(id, amount);
+            });
+            list.appendChild(btn);
+        });
+    }
+    openModal(document.getElementById('selectUpiIdModal'));
+}
+
+function generateReceiveQR(upiId, amount) {
+    const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=ExpenseBook&am=${amount}&cu=INR`;
+
     document.getElementById('receiveQrAmountText').innerText = `₹${amount}`;
+    document.getElementById('receiveQrUpiText').innerText = upiId;
+
     const qrContainer = document.getElementById('receiveQrContainer');
     qrContainer.innerHTML = '';
-    
     new QRCode(qrContainer, {
         text: upiUri,
-        width: 200,
-        height: 200,
-        colorDark : "#000000",
-        colorLight : "#ffffff",
-        correctLevel : QRCode.CorrectLevel.H
+        width: 220,
+        height: 220,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
     });
-    
+
     openModal(document.getElementById('receiveQrModal'));
-});
+}
 
 document.getElementById('initiateUpiPayBtn').addEventListener('click', () => {
     const receiverId = document.getElementById('receiverUpiId').value.trim();
