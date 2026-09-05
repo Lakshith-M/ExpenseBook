@@ -64,11 +64,11 @@ ${text.substring(0, 10000)}
 
     // Use a hardcoded list of fast, reliable models instead of fetching dynamically to save time
     const availableModelIds = [
-      'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant',
-      'llama3-70b-8192',
       'llama3-8b-8192',
-      'mixtral-8x7b-32768'
+      'llama3-70b-8192',
+      'mixtral-8x7b-32768',
+      'gemma2-9b-it',
+      'llama-3.1-8b-instant'
     ];
 
     const systemPrompt = `You are a bank statement transaction extractor. You ONLY output valid JSON arrays. Never output explanations, markdown, or any text outside the JSON array.`;
