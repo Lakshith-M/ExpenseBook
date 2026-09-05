@@ -93,40 +93,54 @@ ${text.substring(0, 10000)}
       return res.status(500).json({ error: "API Failure: " + JSON.stringify(errors) });
     }
     
-    let rawContent = result.choices[0]?.message?.content?.trim() || '[]';
-    
-    // Strip <think>...</think> blocks from reasoning models (qwen, etc.)
+    let rawContent = result.choices[0]?.message?.content?.trim() || '';
+    console.log("Raw AI response (first 600 chars):", rawContent.substring(0, 600));
+
+    // Strategy 1: Strip <think>...</think> blocks (reasoning models like qwen)
     rawContent = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
-    // Strip markdown code block if model wrapped output
-    if (rawContent.startsWith('```')) {
-      rawContent = rawContent.replace(/^```(json)?/i, '').replace(/```[\s\S]*$/, '').trim();
-    }
+    // Strategy 2: Strip markdown code fences (``` or ```json)
+    rawContent = rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
 
-    // Find the first '[' and last ']' — extract raw JSON array even if there's preamble text
-    const arrStart = rawContent.indexOf('[');
-    const arrEnd = rawContent.lastIndexOf(']');
-    if (arrStart !== -1 && arrEnd !== -1 && arrEnd > arrStart) {
-      rawContent = rawContent.substring(arrStart, arrEnd + 1);
-    }
-
-    // Extract array if it was wrapped in an object like {"transactions": [...]}
+    // Strategy 3: Try to parse directly
     let parsedTxs = [];
-    try {
-      const parsed = JSON.parse(rawContent);
-      if (Array.isArray(parsed)) {
-        parsedTxs = parsed;
-      } else {
-        for (const key in parsed) {
-          if (Array.isArray(parsed[key])) {
-            parsedTxs = parsed[key];
-            break;
-          }
-        }
+    const tryParse = (str) => {
+      try {
+        const p = JSON.parse(str);
+        if (Array.isArray(p)) return p;
+        for (const k in p) { if (Array.isArray(p[k])) return p[k]; }
+        return null;
+      } catch { return null; }
+    };
+
+    parsedTxs = tryParse(rawContent);
+
+    // Strategy 4: Extract first [...] JSON array block
+    if (!parsedTxs) {
+      const arrMatch = rawContent.match(/\[[\s\S]*\]/);
+      if (arrMatch) parsedTxs = tryParse(arrMatch[0]);
+    }
+
+    // Strategy 5: Extract first {...} JSON object block
+    if (!parsedTxs) {
+      const objMatch = rawContent.match(/\{[\s\S]*\}/);
+      if (objMatch) parsedTxs = tryParse(objMatch[0]);
+    }
+
+    // Strategy 6: Extract all individual {...} objects from text and compose array
+    if (!parsedTxs) {
+      const singleObjects = [];
+      const objRegex = /\{[^{}]*"date"[^{}]*"amount"[^{}]*\}/g;
+      let m;
+      while ((m = objRegex.exec(rawContent)) !== null) {
+        try { singleObjects.push(JSON.parse(m[0])); } catch {}
       }
-    } catch (parseError) {
-      console.error("Failed to parse Groq response:", rawContent.substring(0, 500));
-      return res.status(500).json({ error: "Failed to parse AI output as JSON. The AI may have returned an unexpected format." });
+      if (singleObjects.length > 0) parsedTxs = singleObjects;
+    }
+
+    if (!parsedTxs || parsedTxs.length === 0) {
+      console.error("All parse strategies failed. Raw content:", rawContent.substring(0, 800));
+      return res.status(500).json({ error: "AI returned no parseable transactions. Try a different file or check your instructions." });
     }
     
     // Clean and validate categories against the allowed list
