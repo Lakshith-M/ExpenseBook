@@ -431,6 +431,64 @@
         </div>
     </div>
 
+    <!-- Modal: Import Options (password + AI instructions) -->
+    <div id="importOptionsModal" class="modal-overlay hidden" style="z-index: 1070;">
+        <div class="modal" style="max-width: 440px;">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-file-import" style="color: var(--primary); margin-right: 8px;"></i>Import Options</h2>
+                <button class="close-btn" data-close="importOptionsModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 1.1rem;">
+                <div id="importOptionsFileName" style="background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); border-radius: 8px; padding: 0.6rem 1rem; font-size: 0.85rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fa-solid fa-file" style="color: var(--primary);"></i>
+                    <span id="importOptionsFileNameText">file.pdf</span>
+                </div>
+                <div class="form-group">
+                    <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.4rem; display: block;">
+                        <i class="fa-solid fa-lock" style="margin-right: 5px;"></i> File Password <span style="font-weight: 400; opacity: 0.6;">(if the file is password protected)</span>
+                    </label>
+                    <input type="password" id="importFilePassword" class="select-input" placeholder="Leave blank if not protected" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.4rem; display: block;">
+                        <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 5px;"></i> AI Instructions <span style="font-weight: 400; opacity: 0.6;">(optional)</span>
+                    </label>
+                    <textarea id="importAiInstructions" class="select-input" rows="3" placeholder="e.g. &#10;- Only import the last 10 transactions&#10;- Skip all salary credits&#10;- Treat 'NEFT' entries as Bank transfers" style="resize: vertical; min-height: 80px; font-family: inherit;"></textarea>
+                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.4rem;">Tell the AI exactly what to extract. Leave blank to import all transactions.</p>
+                </div>
+                <button id="importOptionsProcessBtn" class="btn" style="background: var(--primary); color: white; width: 100%; padding: 0.8rem; font-size: 1rem;">
+                    <i class="fa-solid fa-robot" style="margin-right: 6px;"></i> Process with AI
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Import Preview (confirm before adding) -->
+    <div id="importPreviewModal" class="modal-overlay hidden" style="z-index: 1075;">
+        <div class="modal" style="max-width: 600px; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="flex-shrink: 0;">
+                <div>
+                    <h2><i class="fa-solid fa-list-check" style="color: var(--primary); margin-right: 8px;"></i>Preview Transactions</h2>
+                    <p id="importPreviewSubtitle" style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 2px;"></p>
+                </div>
+                <button class="close-btn" data-close="importPreviewModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="padding: 0 1.25rem; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer; color: var(--text-secondary);">
+                    <input type="checkbox" id="importPreviewSelectAll" checked style="width: 16px; height: 16px; cursor: pointer;"> Select All
+                </label>
+                <span id="importPreviewCount" style="font-size: 0.82rem; color: var(--text-secondary);"></span>
+            </div>
+            <div id="importPreviewList" style="flex: 1; overflow-y: auto; padding: 0 1.25rem 1rem; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+            <div style="padding: 1rem 1.25rem; border-top: 1px solid var(--border); flex-shrink: 0; display: flex; gap: 0.75rem;">
+                <button id="importPreviewCancelBtn" class="btn" style="flex: 1; background: var(--surface); color: var(--text-primary); border: 1px solid var(--border);">Cancel</button>
+                <button id="importPreviewConfirmBtn" class="btn" style="flex: 2; background: #10b981; color: white;">
+                    <i class="fa-solid fa-check" style="margin-right: 6px;"></i> Add Selected Transactions
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Receive UPI QR -->
     <div id="receiveQrModal" class="modal-overlay hidden" style="z-index: 1050;">
         <div class="modal" style="text-align: center;">

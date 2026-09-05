@@ -1572,90 +1572,187 @@ async function exportToPDF() {
     }
 }
 
-// Unified Import Logic (Excel & PDF)
+// ── Import Flow ────────────────────────────────────────────────────────────
+let _pendingImportFile = null; // holds file between modal steps
+
 document.getElementById('importExcelBtn').addEventListener('click', () => {
     document.getElementById('excelFileInput').click();
+    document.getElementById('menuDropdown').classList.add('hidden');
 });
 
-document.getElementById('excelFileInput').addEventListener('change', async function (e) {
+document.getElementById('excelFileInput').addEventListener('change', function (e) {
     const file = e.target.files[0];
     if (!file) return;
+    e.target.value = ''; // Reset so same file can be selected again
 
-    if (file.name.toLowerCase().endsWith('.pdf')) {
-        try {
-            const parsedTxs = await parsePDFStatement(file);
-            if (parsedTxs.length === 0) {
-                alert("No transactions found in this PDF. Ensure it is a Canara Bank or ExpenseBook statement.");
-            } else {
-                processImportedTransactions(parsedTxs, file);
-            }
-        } catch (error) {
-            console.error("PDF parse error:", error);
-            alert("Error parsing PDF file: " + error.message);
-        }
-        e.target.value = '';
-        return;
+    _pendingImportFile = file;
+
+    // Show Import Options modal
+    document.getElementById('importOptionsFileNameText').textContent = file.name;
+    document.getElementById('importFilePassword').value = '';
+    document.getElementById('importAiInstructions').value = '';
+    openModal(document.getElementById('importOptionsModal'));
+});
+
+document.getElementById('importOptionsProcessBtn').addEventListener('click', async () => {
+    const file = _pendingImportFile;
+    if (!file) return;
+
+    const password = document.getElementById('importFilePassword').value.trim();
+    const instructions = document.getElementById('importAiInstructions').value.trim();
+
+    closeModal(document.getElementById('importOptionsModal'));
+
+    // Show AI loading state
+    const loadingModal = document.getElementById('importSummaryModal');
+    const loadingMsg = document.getElementById('importSummaryMsg');
+    if (loadingMsg) {
+        loadingMsg.innerHTML = '<i class="fa-solid fa-robot" style="color: var(--primary); margin-right: 8px;"></i> AI is reading your statement...<br><small style="color: var(--text-secondary);">This may take a few seconds.</small>';
+        openModal(loadingModal);
     }
 
-    const reader = new FileReader();
-    reader.onload = function (evt) {
-        try {
-            const data = new Uint8Array(evt.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
+    try {
+        let parsedTxs = [];
+        if (file.name.toLowerCase().endsWith('.pdf')) {
+            parsedTxs = await parsePDFStatement(file, password, instructions);
+        } else {
+            parsedTxs = await parseExcelStatement(file, instructions);
+        }
 
-            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        if (loadingMsg) closeModal(loadingModal);
 
-            // Show loading state
-            const importSummaryMsg = document.getElementById('importSummaryMsg');
-            if (importSummaryMsg) {
-                importSummaryMsg.innerHTML = 'AI is reading the document... <div class="spinner"></div>';
-                openModal(document.getElementById('importSummaryModal'));
-            }
+        if (parsedTxs.length === 0) {
+            alert("No transactions found. Try adjusting your AI instructions or check if the file is correct.");
+            return;
+        }
 
-            const rawText = rows.map(r => Array.isArray(r) ? r.join(', ') : '').join('\n');
-            const categories = Array.from(document.getElementById('category').options).map(opt => opt.value);
-            const baseUrl = window.location.hostname === 'localhost' && window.location.protocol === 'http:' 
-                ? 'https://expense-book-gamma.vercel.app' 
-                : window.location.origin;
-                
-            fetch(`${baseUrl}/api/parse-statement`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: rawText, categories })
-            })
-            .then(async res => {
+        showImportPreview(parsedTxs, file);
+
+    } catch (error) {
+        if (loadingMsg) closeModal(loadingModal);
+        console.error("Import error:", error);
+        alert("Error processing file: " + error.message);
+    }
+});
+
+// ── Import Preview Modal ────────────────────────────────────────────────────
+function showImportPreview(parsedTxs, fileObj) {
+    const list = document.getElementById('importPreviewList');
+    const subtitle = document.getElementById('importPreviewSubtitle');
+    const countEl = document.getElementById('importPreviewCount');
+    list.innerHTML = '';
+
+    subtitle.textContent = `${parsedTxs.length} transaction${parsedTxs.length !== 1 ? 's' : ''} detected from "${fileObj.name}"`;
+
+    const updateCount = () => {
+        const checked = list.querySelectorAll('input[type=checkbox]:checked').length;
+        countEl.textContent = `${checked} of ${parsedTxs.length} selected`;
+    };
+
+    parsedTxs.forEach((tx, idx) => {
+        const isIncome = tx.type === 'income';
+        const sign = isIncome ? '+' : '-';
+        const color = isIncome ? '#10b981' : '#ef4444';
+        const dateStr = tx.date ? new Date(tx.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Unknown';
+
+        const row = document.createElement('label');
+        row.style.cssText = `display: flex; align-items: flex-start; gap: 0.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 1rem; cursor: pointer; transition: border-color 0.2s;`;
+        row.innerHTML = `
+            <input type="checkbox" data-idx="${idx}" checked style="width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; cursor: pointer;">
+            <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
+                    <span style="font-weight: 500; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${tx.title || 'Unknown'}</span>
+                    <span style="color: ${color}; font-weight: 600; font-size: 0.95rem; flex-shrink: 0;">${sign}₹${parseFloat(tx.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 4px; flex-wrap: wrap;">
+                    <span style="font-size: 0.75rem; color: var(--text-secondary);">${dateStr}</span>
+                    <span style="font-size: 0.75rem; background: rgba(59,130,246,0.1); color: var(--primary); border-radius: 4px; padding: 0 5px;">${tx.category || 'Undefined'}</span>
+                    <span style="font-size: 0.75rem; background: rgba(255,255,255,0.05); color: var(--text-secondary); border-radius: 4px; padding: 0 5px;">${tx.paymentMethod || 'Bank'}</span>
+                </div>
+            </div>
+        `;
+        const checkbox = row.querySelector('input[type=checkbox]');
+        checkbox.addEventListener('change', () => {
+            row.style.borderColor = checkbox.checked ? 'var(--primary)' : 'var(--border)';
+            updateCount();
+            // Sync select all
+            const all = list.querySelectorAll('input[type=checkbox]');
+            document.getElementById('importPreviewSelectAll').checked = [...all].every(c => c.checked);
+        });
+        row.style.borderColor = 'var(--primary)';
+        list.appendChild(row);
+    });
+
+    // Select All logic
+    const selectAllCb = document.getElementById('importPreviewSelectAll');
+    selectAllCb.checked = true;
+    selectAllCb.onchange = () => {
+        list.querySelectorAll('input[type=checkbox]').forEach(cb => {
+            cb.checked = selectAllCb.checked;
+            cb.closest('label').style.borderColor = selectAllCb.checked ? 'var(--primary)' : 'var(--border)';
+        });
+        updateCount();
+    };
+
+    updateCount();
+
+    // Cancel button
+    document.getElementById('importPreviewCancelBtn').onclick = () => closeModal(document.getElementById('importPreviewModal'));
+
+    // Confirm button
+    document.getElementById('importPreviewConfirmBtn').onclick = () => {
+        const selectedTxs = [];
+        list.querySelectorAll('input[type=checkbox]').forEach((cb, i) => {
+            if (cb.checked) selectedTxs.push(parsedTxs[i]);
+        });
+        closeModal(document.getElementById('importPreviewModal'));
+        if (selectedTxs.length === 0) {
+            alert("No transactions selected.");
+            return;
+        }
+        processImportedTransactions(selectedTxs, fileObj);
+    };
+
+    openModal(document.getElementById('importPreviewModal'));
+}
+
+// ── Parse Excel via AI ──────────────────────────────────────────────────────
+async function parseExcelStatement(file, instructions) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = async function(evt) {
+            try {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                const rawText = rows.map(r => Array.isArray(r) ? r.join(', ') : '').join('\n');
+
+                const cats = Array.from(document.getElementById('category').options).map(opt => opt.value);
+                const baseUrl = window.location.hostname === 'localhost' && window.location.protocol === 'http:'
+                    ? 'https://expense-book-gamma.vercel.app'
+                    : window.location.origin;
+
+                const res = await fetch(`${baseUrl}/api/parse-statement`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: rawText, categories: cats, instructions })
+                });
                 if (!res.ok) {
                     const err = await res.json();
                     throw new Error(err.error || 'AI parsing failed');
                 }
-                return res.json();
-            })
-            .then(parsedTxs => {
-                if (importSummaryMsg) closeModal(document.getElementById('importSummaryModal'));
-                if (parsedTxs.length > 0) {
-                    processImportedTransactions(parsedTxs, file);
-                } else {
-                    alert("No valid transactions found in the Excel file.");
-                }
-            })
-            .catch(err => {
-                if (importSummaryMsg) closeModal(document.getElementById('importSummaryModal'));
-                console.error(err);
-                alert("Error parsing the Excel file: " + err.message);
-            });
-        } catch (error) {
-            console.error(error);
-            alert("Error parsing the Excel file. Please ensure it is a valid format.");
-        }
-    };
-    reader.readAsArrayBuffer(file);
-    e.target.value = ''; // reset
-});
+                resolve(await res.json());
+            } catch(err) { reject(err); }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+}
+
 
 // Unified PDF parsing entry point
-async function parsePDFStatement(file) {
+async function parsePDFStatement(file, password, instructions) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = async function(e) {
@@ -1664,7 +1761,12 @@ async function parsePDFStatement(file) {
                 if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
                     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
                 }
-                const pdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+
+                // Support password-protected PDFs
+                const loadingTask = pdfjsLib.getDocument(
+                    password ? { data: typedarray, password } : { data: typedarray }
+                );
+                const pdf = await loadingTask.promise;
                 let fullText = "";
                 
                 for (let i = 1; i <= pdf.numPages; i++) {
@@ -1681,23 +1783,16 @@ async function parsePDFStatement(file) {
                     fullText += "\n\n--- PAGE BREAK ---\n\n";
                 }
                 
-                // Show loading state
-                const importSummaryMsg = document.getElementById('importSummaryMsg');
-                if (importSummaryMsg) {
-                    importSummaryMsg.innerHTML = 'AI is reading the document... <div class="spinner"></div>';
-                    openModal(document.getElementById('importSummaryModal'));
-                }
-                
                 // Call AI endpoint
-                const categories = Array.from(document.getElementById('category').options).map(opt => opt.value);
+                const cats = Array.from(document.getElementById('category').options).map(opt => opt.value);
                 const baseUrl = window.location.hostname === 'localhost' && window.location.protocol === 'http:' 
-                    ? 'https://expense-book-gamma.vercel.app' // Fallback for capacitor
+                    ? 'https://expense-book-gamma.vercel.app'
                     : window.location.origin;
                     
                 const response = await fetch(`${baseUrl}/api/parse-statement`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: fullText, categories })
+                    body: JSON.stringify({ text: fullText, categories: cats, instructions })
                 });
                 
                 if (!response.ok) {
@@ -1705,13 +1800,7 @@ async function parsePDFStatement(file) {
                     throw new Error(err.error || 'AI parsing failed');
                 }
                 
-                const txs = await response.json();
-                
-                if (importSummaryMsg) {
-                    closeModal(document.getElementById('importSummaryModal'));
-                }
-                
-                resolve(txs);
+                resolve(await response.json());
             } catch (err) {
                 reject(err);
             }
@@ -1719,6 +1808,7 @@ async function parsePDFStatement(file) {
         reader.readAsArrayBuffer(file);
     });
 }
+
 
 function parseExpenseBookPDFText(fullText) {
     const parsedTxs = [];

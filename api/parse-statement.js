@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { text, categories } = req.body;
+  const { text, categories, instructions } = req.body;
   if (!text) {
     return res.status(400).json({ error: 'Missing text in request body' });
   }
@@ -48,7 +48,10 @@ For each transaction, determine:
 - type: "expense" (debit) or "income" (credit)
 - method: "UPI", "Cash", or "Bank" (default to Bank if unknown)
 - category: Pick EXACTLY ONE from this list: [${availableCategoriesStr}]. If unsure, use "Undefined".
-
+${instructions ? `
+Additional instructions from the user (STRICTLY follow these):
+${instructions}
+` : ''}
 Respond ONLY with a valid JSON array of objects. Do not wrap in markdown or backticks. Just the raw JSON array. Example:
 [
   {"date": "2023-10-15", "title": "AMAZON RETAIL", "amount": 1500, "type": "expense", "method": "UPI", "category": "Shopping"}
