@@ -1184,10 +1184,21 @@ function renderChart(filteredTransactions) {
         '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'
     ];
 
+    const isDark = currentTheme === 'dark';
+    const textColor = isDark ? '#f8fafc' : '#0f172a';
+    const borderColor = isDark ? '#0b0f19' : '#ffffff';
+    const tooltipBg = isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+    const tooltipText = isDark ? '#fff' : '#0f172a';
+
     if (expenseChartInstance) {
         expenseChartInstance.data.labels = labels;
         expenseChartInstance.data.datasets[0].data = data;
         expenseChartInstance.data.datasets[0].backgroundColor = colors.slice(0, labels.length);
+        expenseChartInstance.data.datasets[0].borderColor = borderColor;
+        expenseChartInstance.options.plugins.legend.labels.color = textColor;
+        expenseChartInstance.options.plugins.tooltip.backgroundColor = tooltipBg;
+        expenseChartInstance.options.plugins.tooltip.titleColor = tooltipText;
+        expenseChartInstance.options.plugins.tooltip.bodyColor = tooltipText;
         expenseChartInstance.update();
         return;
     }
@@ -1200,7 +1211,7 @@ function renderChart(filteredTransactions) {
                 data: data,
                 backgroundColor: colors.slice(0, labels.length),
                 borderWidth: 2,
-                borderColor: '#0b0f19' // Match --bg-color
+                borderColor: borderColor
             }]
         },
         options: {
@@ -1210,7 +1221,7 @@ function renderChart(filteredTransactions) {
                 legend: {
                     position: 'right',
                     labels: {
-                        color: '#f8fafc', // Match --text-primary
+                        color: textColor,
                         font: {
                             family: "'Outfit', sans-serif",
                             size: 13
@@ -1218,7 +1229,9 @@ function renderChart(filteredTransactions) {
                     }
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                    backgroundColor: tooltipBg,
+                    titleColor: tooltipText,
+                    bodyColor: tooltipText,
                     titleFont: { family: "'Outfit', sans-serif" },
                     bodyFont: { family: "'Outfit', sans-serif" },
                     callbacks: {
