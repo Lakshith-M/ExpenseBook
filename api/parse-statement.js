@@ -62,21 +62,37 @@ Raw Text:
 ${text.substring(0, 10000)}
 """`;
 
-    // Use a hardcoded list of fast, reliable models instead of fetching dynamically to save time
-    const availableModelIds = [
-      'llama3-8b-8192',
-      'llama3-70b-8192',
-      'mixtral-8x7b-32768',
-      'gemma2-9b-it',
-      'llama-3.1-8b-instant'
-    ];
+    // Fetch available models dynamically from Groq to avoid decommissioned/404 errors
+    let availableModelIds = [];
+    try {
+      const modelsRes = await fetch("https://api.groq.com/openai/v1/models", {
+        headers: { Authorization: `Bearer ${apiKey}` }
+      });
+      const modelsData = await modelsRes.json();
+      if (modelsData.data) {
+        // Prefer instruct/chat models, exclude embedding/whisper
+        availableModelIds = modelsData.data
+          .map(m => m.id)
+          .filter(id => !id.includes('whisper') && !id.includes('embed') && !id.includes('vision'));
+      }
+    } catch(e) {
+      console.warn("Could not fetch model list:", e.message);
+    }
+
+    if (availableModelIds.length === 0) {
+      // Ultimate fallback if fetch fails
+      availableModelIds = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+    }
 
     const systemPrompt = `You are a bank statement transaction extractor. You ONLY output valid JSON arrays. Never output explanations, markdown, or any text outside the JSON array.`;
 
     let result;
     let errors = [];
     
-    for (const modelName of availableModelIds) {
+    // Only try up to 2 models to avoid Vercel's 10-second timeout limit
+    const modelsToTry = availableModelIds.slice(0, 2);
+    
+    for (const modelName of modelsToTry) {
       try {
         result = await groq.chat.completions.create({
           messages: [
@@ -86,7 +102,7 @@ ${text.substring(0, 10000)}
           model: modelName,
           temperature: 0,
         });
-        // Validate we got something useful before breaking
+        
         const testContent = result.choices[0]?.message?.content?.trim() || '';
         if (testContent.length > 5) break;
         result = null;
