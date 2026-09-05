@@ -172,30 +172,68 @@ document.getElementById('verifyPaymentFailBtn').addEventListener('click', () => 
 
 // QR Scanner Logic
 let html5QrcodeScanner = null;
+// Helper to process decoded text from both camera and file
+function handleDecodedText(decodedText) {
+    let pa = decodedText;
+    if (decodedText.toLowerCase().startsWith('upi://')) {
+        try {
+            const url = new URL(decodedText);
+            pa = url.searchParams.get('pa') || decodedText;
+        } catch (e) {}
+    }
+    document.getElementById('receiverUpiId').value = pa;
+    // Close scanner modal and clean up
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.clear().catch(e => console.error(e));
+        html5QrcodeScanner = null;
+    }
+    document.getElementById('qrScannerModal').classList.add('hidden');
+}
 
-document.getElementById('scanQrBtn').addEventListener('click', () => {
+document.getElementById('scanQrBtn').addEventListener('click', async () => {
+    // Request camera permission at runtime
+    try {
+        const { Permissions } = await import('@capacitor/permissions');
+        const result = await Permissions.request({ name: 'camera' });
+        if (!result.granted) {
+            alert('Camera permission denied. Please enable it in settings.');
+            return;
+        }
+    } catch (e) {
+        console.error('Permission request failed', e);
+        // Fallback to direct getUserMedia request
+        try {
+            await navigator.mediaDevices.getUserMedia({ video: true });
+        } catch (err) {
+            alert('Camera access is required to scan QR codes.');
+            return;
+        }
+    }
     document.getElementById('qrScannerModal').classList.remove('hidden');
     if (!html5QrcodeScanner) {
-        // Must use 'Html5QrcodeScanner' from the global scope injected by script tag
         html5QrcodeScanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
         html5QrcodeScanner.render((decodedText) => {
-            // Parse UPI link or raw string
-            let pa = decodedText;
-            if (decodedText.toLowerCase().startsWith('upi://')) {
-                try {
-                    const url = new URL(decodedText);
-                    pa = url.searchParams.get('pa') || decodedText;
-                } catch(e) {}
-            }
-            document.getElementById('receiverUpiId').value = pa;
-            
-            // Stop scanning and close
-            html5QrcodeScanner.clear().catch(e => console.error(e));
-            document.getElementById('qrScannerModal').classList.add('hidden');
-            html5QrcodeScanner = null;
-        }, (error) => {
-            // Ignore scan errors as they fire continuously until a code is found
-        });
+            handleDecodedText(decodedText);
+        }, (error) => {});
+    }
+});
+
+// Gallery button handling
+document.getElementById('galleryBtn').addEventListener('click', () => {
+    document.getElementById('qr-file-input').click();
+});
+
+document.getElementById('qr-file-input').addEventListener('change', async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    // Use Html5Qrcode to scan the selected file
+    const html5QrCode = new Html5Qrcode("qr-reader");
+    try {
+        const decodedText = await html5QrCode.scanFile(file, true);
+        handleDecodedText(decodedText);
+    } catch (err) {
+        console.error('File scan error', err);
     }
 });
 
@@ -502,13 +540,15 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
         window.isUpiPayFlow = false;
         window.pendingUpiTx = tx;
         
+        // Read receiver ID BEFORE resetting the form
+        const receiverId = document.getElementById('receiverUpiId').value.trim();
+        
         e.target.reset();
         document.getElementById('txId').value = '';
         document.getElementById('date').valueAsDate = new Date();
         closeModal(transactionModal);
         
-        const receiverId = document.getElementById('receiverUpiId').value.trim();
-        const upiLink = `upi://pay?pa=${encodeURIComponent(receiverId)}&pn=Receiver&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(title || 'Payment')}`;
+        const upiLink = `upi://pay?pa=${encodeURIComponent(receiverId)}&pn=Receiver&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(title || 'Payment')}&tr=${Date.now()}`;
         
         window.isAwaitingUpiReturn = true;
         window.location.href = upiLink;
@@ -911,6 +951,22 @@ function renderAccountList() {
             actionsDiv.innerHTML = `
                 <button class="save-btn" title="Save" style="background:transparent; border:none; cursor:pointer; color:var(--income); font-size:1.1rem; padding:4px;"><i class="fa-solid fa-check"></i></button>
                 <button class="cancel-btn" title="Cancel" style="background:transparent; border:none; cursor:pointer; color:var(--text-secondary); font-size:1.1rem; padding:4px;"><i class="fa-solid fa-xmark"></i></button>
+            `;
+            
+            const modalHeader = document.createElement('div');
+            modalHeader.className = 'modal-header';
+            modalHeader.innerHTML = `
+                <h2>Scan UPI QR</h2>
+                <button class="close-btn" data-close="qrScannerModal" id="closeQrScannerBtn"><i class="fa-solid fa-xmark"></i></button>
+            `;
+            const modalBody = document.createElement('div');
+            modalBody.className = 'modal-body';
+            modalBody.style.textAlign = 'center';
+            modalBody.innerHTML = `
+                <div id="qr-reader" style="width: 100%; border-radius: 8px; overflow: hidden; min-height: 250px; position: relative;">
+                    <button id="galleryBtn" class="gallery-btn" title="Select from Gallery"><i class="fa-solid fa-image"></i></button>
+                </div>
+                <input type="file" id="qr-file-input" accept="image/*" style="display:none;" />
             `;
             
             const saveBtn = actionsDiv.querySelector('.save-btn');

@@ -12,7 +12,7 @@ export async function getCategory(text) {
     if (t.includes('bill') || t.includes('electricity') || t.includes('water') || t.includes('internet') || t.includes('wifi') || t.includes('recharge') || t.includes('utilities') || t.includes('phone') || t.includes('mobile')) return 'Utilities';
     if (t.includes('movie') || t.includes('netflix') || t.includes('amazon') || t.includes('prime') || t.includes('spotify') || t.includes('game') || t.includes('entertainment') || t.includes('cinema') || t.includes('music')) return 'Entertainment';
     if (t.includes('salary') || t.includes('bonus') || t.includes('freelance') || t.includes('wage') || t.includes('income') || t.includes('pay')) return 'Salary';
-    return 'Personal';
+    return 'Undefined';
   };
 
   try {
@@ -23,7 +23,8 @@ export async function getCategory(text) {
         if (stored) activeCategories = JSON.parse(stored);
     } catch(e) {}
     if (activeCategories.length === 0) {
-        activeCategories = ['Food', 'Personal', 'Transport', 'Utilities', 'Entertainment', 'Salary', 'Undefined'];
+        // Default categories without 'Personal' to avoid fallback dominance
+        activeCategories = ['Food', 'Transport', 'Utilities', 'Entertainment', 'Salary', 'Undefined'];
     }
 
     // Send request to our own Vercel backend
