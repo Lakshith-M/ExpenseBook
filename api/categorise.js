@@ -77,6 +77,11 @@ export default async function handler(req, res) {
     }
     
     let category = result.choices[0]?.message?.content?.trim() || 'Other';
+    // Reasoning models output <think>...</think> blocks, we must strip them!
+    category = category.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    // Also remove any generic preamble if present
+    category = category.replace(/^.*category is:?\s*/i, '').trim();
+    // Remove punctuation
     category = category.replace(/[^a-zA-Z]/g, '');
     
     return res.status(200).json({ category, confidence: 1 });
