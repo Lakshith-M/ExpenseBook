@@ -148,13 +148,13 @@ document.getElementById('fabBtn').addEventListener('click', () => {
     // Default date to today
     document.getElementById('date').valueAsDate = new Date();
     
-    // Restore previous defaults if available
-    if (lastAddedTx) {
-        document.querySelector(`input[name="type"][value="${lastAddedTx.type}"]`).checked = true;
-        document.querySelector(`input[name="paymentMethod"][value="${lastAddedTx.paymentMethod}"]`).checked = true;
-        document.getElementById('title').value = lastAddedTx.title;
-        document.getElementById('category').value = lastAddedTx.category;
-    }
+    // Do not restore previous defaults, user wants a fresh form
+    // if (lastAddedTx) {
+    //     document.querySelector(`input[name="type"][value="${lastAddedTx.type}"]`).checked = true;
+    //     document.querySelector(`input[name="paymentMethod"][value="${lastAddedTx.paymentMethod}"]`).checked = true;
+    //     document.getElementById('title').value = lastAddedTx.title;
+    //     document.getElementById('category').value = lastAddedTx.category;
+    // }
     
     openModal(transactionModal);
 });
