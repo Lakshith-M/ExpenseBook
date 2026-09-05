@@ -114,7 +114,7 @@ function init() {
     }
     
     // Populate categories
-    categories = JSON.parse(localStorage.getItem('expensebook_categories')) || ['Food', 'Personal', 'Transport', 'Utilities', 'Entertainment', 'Salary'];
+    categories = JSON.parse(localStorage.getItem('expensebook_categories')) || ['Food', 'Transport', 'Utilities', 'Entertainment', 'Salary', 'Undefined'];
     if (!categories.includes('Undefined')) {
         categories.push('Undefined');
     }
@@ -721,10 +721,36 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
 });
 
 function deleteCategory(cat) {
-    categories = categories.filter(c => c !== cat);
-    saveCategories();
-    renderCategoryList();
-    populateCategoryDropdowns();
+    if (categories.length <= 1) {
+        alert("Cannot delete the last category.");
+        return;
+    }
+    if (cat === 'Undefined') {
+        alert("Cannot delete the 'Undefined' category.");
+        return;
+    }
+    
+    if (confirm(`Are you sure you want to delete the category "${cat}"? All its transactions will become "Undefined".`)) {
+        let changed = false;
+        transactions.forEach(tx => {
+            if (tx.category === cat) {
+                tx.category = 'Undefined';
+                changed = true;
+            }
+        });
+        
+        if (changed) {
+            saveTransactions();
+        }
+        
+        categories = categories.filter(c => c !== cat);
+        saveCategories();
+        
+        renderCategoryList();
+        populateCategoryDropdowns();
+        updateDashboard();
+        renderTransactions();
+    }
 }
 
 function saveNicknames() {

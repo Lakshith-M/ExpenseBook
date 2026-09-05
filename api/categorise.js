@@ -76,15 +76,26 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "API Failure: " + JSON.stringify(errors) });
     }
     
-    let category = result.choices[0]?.message?.content?.trim() || 'Other';
+    let category = result.choices[0]?.message?.content?.trim() || 'Undefined';
     // Reasoning models output <think>...</think> blocks, we must strip them!
     category = category.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     // Also remove any generic preamble if present
     category = category.replace(/^.*category is:?\s*/i, '').trim();
     // Remove punctuation
-    category = category.replace(/[^a-zA-Z]/g, '');
+    category = category.replace(/[^a-zA-Z ]/g, '').trim();
+
+    // Enforce selection from available categories
+    let finalCategory = 'Undefined';
+    const validCategories = (Array.isArray(categories) && categories.length > 0) 
+        ? categories 
+        : ['Food', 'Transport', 'Utilities', 'Entertainment', 'Salary', 'Undefined'];
+        
+    const match = validCategories.find(c => c.toLowerCase() === category.toLowerCase());
+    if (match) {
+        finalCategory = match;
+    }
     
-    return res.status(200).json({ category, confidence: 1 });
+    return res.status(200).json({ category: finalCategory, confidence: 1 });
   } catch (error) {
     console.error("Vercel Backend Error:", error);
     return res.status(500).json({ error: "API Failure: " + error.message });
