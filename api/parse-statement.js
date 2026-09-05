@@ -62,30 +62,64 @@ Raw Text:
 ${text.substring(0, 10000)}
 """`;
 
-    // Try models in order — same list as categorise.js
-    const modelsToTry = [
-      'qwen/qwen3.6-27b',
-      'openai/gpt-oss-20b',
-      'allam-2-7b',
-      'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant',
-      'llama3-70b-8192',
-      'mixtral-8x7b-32768'
-    ];
-    
+    // Fetch available models dynamically from Groq
+    let availableModelIds = [];
+    try {
+      const modelsRes = await fetch("https://api.groq.com/openai/v1/models", {
+        headers: { Authorization: `Bearer ${apiKey}` }
+      });
+      const modelsData = await modelsRes.json();
+      if (modelsData.data) {
+        // Prefer instruct/chat models, exclude embedding/whisper
+        availableModelIds = modelsData.data
+          .map(m => m.id)
+          .filter(id => !id.includes('whisper') && !id.includes('embed'));
+      }
+    } catch(e) {
+      console.warn("Could not fetch model list:", e.message);
+    }
+
+    // Fallback order if dynamic fetch fails
+    if (availableModelIds.length === 0) {
+      availableModelIds = ['llama3-70b-8192', 'mixtral-8x7b-32768', 'llama3-8b-8192', 'gemma2-9b-it'];
+    }
+
+    const systemPrompt = `You are a bank statement transaction extractor. You ONLY output valid JSON arrays. Never output explanations, markdown, or any text outside the JSON array.`;
+
     let result;
     let errors = [];
     
-    for (const modelName of modelsToTry) {
+    for (const modelName of availableModelIds) {
       try {
         result = await groq.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt }
+          ],
           model: modelName,
           temperature: 0,
+          response_format: { type: 'json_object' }
         });
-        break;
+        // Validate we got something useful before breaking
+        const testContent = result.choices[0]?.message?.content?.trim() || '';
+        if (testContent.length > 5) break;
       } catch (e2) {
-        errors.push({ model: modelName, message: e2.message });
+        // Some models don't support response_format — retry without it
+        try {
+          result = await groq.chat.completions.create({
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: prompt }
+            ],
+            model: modelName,
+            temperature: 0,
+          });
+          const testContent = result.choices[0]?.message?.content?.trim() || '';
+          if (testContent.length > 5) break;
+          result = null;
+        } catch (e3) {
+          errors.push({ model: modelName, message: e3.message });
+        }
       }
     }
     
