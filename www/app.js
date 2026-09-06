@@ -1547,25 +1547,54 @@ async function exportToPDF() {
     if (window.Capacitor && window.Capacitor.isNativePlatform()) {
         try {
             const base64Data = doc.output('datauristring').split(',')[1];
-            
             const Filesystem = window.Capacitor.Plugins.Filesystem;
             const Share = window.Capacitor.Plugins.Share;
-            
+
+            // Write to CACHE directory first
             const writeResult = await Filesystem.writeFile({
                 path: fileName,
                 data: base64Data,
-                directory: 'CACHE' // CACHE is best for temp share files
+                directory: 'CACHE'
             });
-            
-            await Share.share({
-                title: fileName,
-                text: 'Here is my ExpenseBook statement.',
-                url: writeResult.uri,
-                dialogTitle: 'Save or Share PDF'
-            });
+
+            // Try Share if available
+            if (Share && typeof Share.share === 'function') {
+                await Share.share({
+                    title: fileName,
+                    text: 'My ExpenseBook Statement',
+                    url: writeResult.uri,
+                    dialogTitle: 'Save or Share PDF'
+                });
+            } else {
+                // Fallback: write to Documents/Downloads and notify
+                try {
+                    const dlResult = await Filesystem.writeFile({
+                        path: `Download/${fileName}`,
+                        data: base64Data,
+                        directory: 'EXTERNAL_STORAGE'
+                    });
+                    alert(`PDF saved to Downloads folder: ${fileName}`);
+                } catch {
+                    // Last resort: trigger browser download via blob
+                    const pdfBlob = doc.output('blob');
+                    const url = URL.createObjectURL(pdfBlob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = fileName; a.click();
+                    URL.revokeObjectURL(url);
+                }
+            }
         } catch (e) {
             console.error("Native export failed:", e);
-            alert("Error exporting PDF on device. " + e.message);
+            // Final fallback — just save via browser
+            try {
+                const pdfBlob = doc.output('blob');
+                const url = URL.createObjectURL(pdfBlob);
+                const a = document.createElement('a');
+                a.href = url; a.download = fileName; a.click();
+                URL.revokeObjectURL(url);
+            } catch {
+                alert("Could not export PDF: " + e.message);
+            }
         }
     } else {
         doc.save(fileName);
