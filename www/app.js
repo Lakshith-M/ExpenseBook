@@ -1577,10 +1577,57 @@ function showPDFViewer(doc, fileName) {
                 </button>
             </div>
         </div>
-        <iframe src="${dataUri}" style="flex:1; border:none; width:100%; background:white;"></iframe>
+        <div id="pdfRenderContainer" style="flex:1; overflow-y:auto; background:#f1f5f9; display:flex; flex-direction:column; align-items:center; padding:1rem; gap:1rem;">
+            <div id="pdfLoading" style="padding: 2rem; color: #64748b; font-weight: 500;">Rendering PDF...</div>
+        </div>
     `;
 
     document.body.appendChild(overlay);
+
+    // Render PDF with PDF.js
+    setTimeout(() => {
+        const pdfData = doc.output('arraybuffer');
+        if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+        
+        window.pdfjsLib.getDocument({ data: pdfData }).promise.then(async pdf => {
+            const container = document.getElementById('pdfRenderContainer');
+            const loading = document.getElementById('pdfLoading');
+            if(loading) loading.remove();
+
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                
+                // Calculate scale to fit width for mobile devices
+                const viewportDesktop = page.getViewport({ scale: 1.5 });
+                const screenWidth = window.innerWidth - 32; // 32px for padding
+                let scale = 1.5;
+                if (viewportDesktop.width > screenWidth) {
+                    scale = screenWidth / page.getViewport({ scale: 1.0 }).width;
+                }
+                const viewport = page.getViewport({ scale: scale * 1.5 }); // render at 1.5x resolution of display size
+                
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                canvas.style.width = '100%';
+                canvas.style.maxWidth = (viewport.width / 1.5) + 'px';
+                canvas.style.background = 'white';
+                canvas.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+                
+                container.appendChild(canvas);
+                
+                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+            }
+        }).catch(err => {
+            console.error("PDF Render Error:", err);
+            const container = document.getElementById('pdfRenderContainer');
+            if (container) container.innerHTML = '<p style="color:red; padding: 2rem;">Failed to preview PDF on this device. You can still save it.</p>';
+        });
+    }, 100);
+
 
     // Save / Download button
     document.getElementById('pdfDownloadBtn').onclick = () => {
