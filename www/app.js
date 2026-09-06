@@ -1544,61 +1544,69 @@ async function exportToPDF() {
 
     const fileName = `ExpenseBook_Statement_${new Date().toISOString().split('T')[0]}.pdf`;
 
-    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-        try {
-            const base64Data = doc.output('datauristring').split(',')[1];
+    // Show PDF in in-app full-screen viewer (works everywhere)
+    showPDFViewer(doc, fileName);
+}
+
+function showPDFViewer(doc, fileName) {
+    const dataUri = doc.output('datauristring');
+
+    // Remove any existing viewer
+    const existing = document.getElementById('pdfViewerOverlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'pdfViewerOverlay';
+    overlay.style.cssText = `
+        position: fixed; inset: 0; z-index: 9999;
+        background: #0f172a;
+        display: flex; flex-direction: column;
+    `;
+
+    overlay.innerHTML = `
+        <div style="display:flex; align-items:center; justify-content:space-between; padding: 0.75rem 1.1rem; background:#1e293b; border-bottom:1px solid rgba(255,255,255,0.08); flex-shrink:0;">
+            <span style="font-weight:600; font-size:0.95rem; color:#f1f5f9;">
+                <i class="fa-solid fa-file-pdf" style="color:#ef4444; margin-right:8px;"></i>${fileName}
+            </span>
+            <div style="display:flex; gap:0.6rem;">
+                <button id="pdfDownloadBtn" style="background:#3b82f6; color:white; border:none; border-radius:8px; padding:0.45rem 1rem; font-size:0.85rem; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-download"></i> Save
+                </button>
+                <button id="pdfCloseBtn" style="background:rgba(255,255,255,0.08); color:#f1f5f9; border:none; border-radius:8px; padding:0.45rem 0.8rem; font-size:0.85rem; cursor:pointer;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+        <iframe src="${dataUri}" style="flex:1; border:none; width:100%; background:white;"></iframe>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Save / Download button
+    document.getElementById('pdfDownloadBtn').onclick = () => {
+        if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+            const base64Data = dataUri.split(',')[1];
             const Filesystem = window.Capacitor.Plugins.Filesystem;
             const Share = window.Capacitor.Plugins.Share;
-
-            // Write to CACHE directory first
-            const writeResult = await Filesystem.writeFile({
-                path: fileName,
-                data: base64Data,
-                directory: 'CACHE'
-            });
-
-            // Try Share if available
-            if (Share && typeof Share.share === 'function') {
-                await Share.share({
-                    title: fileName,
-                    text: 'My ExpenseBook Statement',
-                    url: writeResult.uri,
-                    dialogTitle: 'Save or Share PDF'
-                });
-            } else {
-                // Fallback: write to Documents/Downloads and notify
-                try {
-                    const dlResult = await Filesystem.writeFile({
-                        path: `Download/${fileName}`,
-                        data: base64Data,
-                        directory: 'EXTERNAL_STORAGE'
-                    });
-                    alert(`PDF saved to Downloads folder: ${fileName}`);
-                } catch {
-                    // Last resort: trigger browser download via blob
-                    const pdfBlob = doc.output('blob');
-                    const url = URL.createObjectURL(pdfBlob);
+            Filesystem.writeFile({ path: fileName, data: base64Data, directory: 'CACHE' })
+                .then(writeResult => {
+                    if (Share && typeof Share.share === 'function') {
+                        Share.share({ title: fileName, url: writeResult.uri, dialogTitle: 'Save or Share PDF' });
+                    } else {
+                        alert('PDF saved! Check your Downloads folder.');
+                    }
+                }).catch(() => {
                     const a = document.createElement('a');
-                    a.href = url; a.download = fileName; a.click();
-                    URL.revokeObjectURL(url);
-                }
-            }
-        } catch (e) {
-            console.error("Native export failed:", e);
-            // Final fallback — just save via browser
-            try {
-                const pdfBlob = doc.output('blob');
-                const url = URL.createObjectURL(pdfBlob);
-                const a = document.createElement('a');
-                a.href = url; a.download = fileName; a.click();
-                URL.revokeObjectURL(url);
-            } catch {
-                alert("Could not export PDF: " + e.message);
-            }
+                    a.href = dataUri; a.download = fileName; a.click();
+                });
+        } else {
+            const a = document.createElement('a');
+            a.href = dataUri; a.download = fileName; a.click();
         }
-    } else {
-        doc.save(fileName);
-    }
+    };
+
+    // Close button
+    document.getElementById('pdfCloseBtn').onclick = () => overlay.remove();
 }
 
 // ── Import Flow ────────────────────────────────────────────────────────────
