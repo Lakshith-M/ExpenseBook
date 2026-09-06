@@ -59,7 +59,7 @@ Respond ONLY with a valid JSON array of objects. Do not wrap in markdown or back
 
 Raw Text:
 """
-${text.substring(0, 10000)}
+${text.substring(0, 4000)}
 """`;
 
     // Fetch available models dynamically from Groq to avoid decommissioned/404 errors
@@ -101,6 +101,7 @@ ${text.substring(0, 10000)}
           ],
           model: modelName,
           temperature: 0,
+          max_tokens: 950,
         });
         
         const testContent = result.choices[0]?.message?.content?.trim() || '';
