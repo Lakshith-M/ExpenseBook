@@ -1752,11 +1752,17 @@ async function parseExcelStatement(file, instructions) {
                         const rawAmount = row[colAmount];
                         if (!rawTitle || !rawAmount) continue;
 
-                        // Parse date
+                        // Parse date — XLSX may return Excel serial numbers (e.g. 45519 for Aug 15 2024)
                         let date = '';
                         try {
-                            const d = new Date(rawDate);
-                            if (!isNaN(d)) date = d.toISOString().split('T')[0];
+                            if (typeof rawDate === 'number') {
+                                // Excel serial: days since Jan 1 1900 (with leap-year bug offset of 25569 to Unix epoch)
+                                const jsDate = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+                                if (!isNaN(jsDate)) date = jsDate.toISOString().split('T')[0];
+                            } else {
+                                const d = new Date(rawDate);
+                                if (!isNaN(d)) date = d.toISOString().split('T')[0];
+                            }
                         } catch {}
 
                         // Parse amount
