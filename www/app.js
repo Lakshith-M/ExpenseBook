@@ -1806,9 +1806,9 @@ async function parseExcelStatement(file, instructions) {
                 // ── Fallback: send to AI for unstructured files ──
                 const rawText = rows.map(r => Array.isArray(r) ? r.join(', ') : '').join('\n');
                 const cats = validCats;
-                const baseUrl = window.location.hostname === 'localhost' && window.location.protocol === 'http:'
-                    ? 'https://expense-book-gamma.vercel.app'
-                    : window.location.origin;
+                const baseUrl = (window.location.protocol === 'https:' && !window.location.hostname.includes('localhost'))
+                    ? window.location.origin
+                    : 'https://expense-book-gamma.vercel.app';
 
                 const res = await fetch(`${baseUrl}/api/parse-statement`, {
                     method: 'POST',
@@ -1827,7 +1827,13 @@ async function parseExcelStatement(file, instructions) {
                     }
                     throw new Error(errMessage);
                 }
-                resolve(await res.json());
+                const responseText = await res.text();
+                try {
+                    resolve(JSON.parse(responseText));
+                } catch(e) {
+                    console.error('Response was not JSON:', responseText.substring(0, 300));
+                    throw new Error('Server returned an unexpected response. Please try again.');
+                }
             } catch(err) { reject(err); }
 
         };
@@ -1870,9 +1876,9 @@ async function parsePDFStatement(file, password, instructions) {
                 
                 // Call AI endpoint
                 const cats = Array.from(document.getElementById('category').options).map(opt => opt.value);
-                const baseUrl = window.location.hostname === 'localhost' && window.location.protocol === 'http:' 
-                    ? 'https://expense-book-gamma.vercel.app'
-                    : window.location.origin;
+                const baseUrl = (window.location.protocol === 'https:' && !window.location.hostname.includes('localhost'))
+                    ? window.location.origin
+                    : 'https://expense-book-gamma.vercel.app';
                     
                 const response = await fetch(`${baseUrl}/api/parse-statement`, {
                     method: 'POST',
@@ -1893,7 +1899,13 @@ async function parsePDFStatement(file, password, instructions) {
                     throw new Error(errMessage);
                 }
                 
-                resolve(await response.json());
+                const responseText = await response.text();
+                try {
+                    resolve(JSON.parse(responseText));
+                } catch(e) {
+                    console.error('Response was not JSON:', responseText.substring(0, 300));
+                    throw new Error('Server returned an unexpected response. Please try again.');
+                }
             } catch (err) {
                 reject(err);
             }
