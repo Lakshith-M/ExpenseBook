@@ -1,17 +1,17 @@
 # ExpenseBook
 
-An AI-powered, privacy-first personal finance tracker built for Android.
+A fast, privacy-first personal finance tracker built for Android.
 
-ExpenseBook helps you track your income and expenses effortlessly. You can manually log transactions or directly import your bank statements using AI. All data stays locally on your device—no accounts, no cloud sync, complete privacy.
+ExpenseBook helps you track your income and expenses effortlessly. You can manually log transactions or directly import your bank statements. All parsing is done 100% locally on your device—no AI, no backend servers, no cloud sync, complete privacy.
 
 ## Features
 
 - **Smart Dashboard:** Get an instant breakdown of your total income, expenses, and current balance, categorized by payment methods (Cash, UPI, Bank).
-- **AI Bank Statement Import:** Upload a PDF or Excel bank statement. The AI will read, extract, and categorize your transactions. You get a full preview before anything is added.
-- **Auto-Categorization:** One tap automatically assigns appropriate categories to your unorganized transactions using AI.
-- **Receive via UPI:** Generate instant QR codes for your saved UPI IDs to easily receive payments.
+- **Local Bank Statement Import:** Upload a PDF or Excel bank statement. The app uses robust local algorithms to extract your transactions. Supports **HDFC Bank Excel**, **Canara Bank PDF**, and **ExpenseBook PDF** formats.
+- **UPI IDs Filtering & QR Tagging:** Save your UPI IDs, generate receive QR codes, automatically tag received transactions to your chosen UPI ID, and filter your dashboard by specific UPI IDs.
+- **Detailed Transactions:** Add descriptions and categorize your transactions easily.
 - **Export to PDF:** Export your transaction history as a clean, formatted PDF right from the app.
-- **100% Private:** Built with a local-first architecture. Your financial data never leaves your device. No signup required.
+- **100% Private:** Built with a local-first architecture. Your financial data never leaves your device. No signup required, no AI used.
 
 ## Installation (Android)
 
@@ -23,13 +23,11 @@ ExpenseBook helps you track your income and expenses effortlessly. You can manua
 
 - **Frontend / UI:** HTML, CSS, JavaScript (Vanilla, no framework)
 - **Mobile Packaging:** Capacitor
-- **Backend (AI Processing):** Serverless API hosted on Vercel
-- **AI Models:** Powered by Groq (dynamically routes to available models)
 - **PDF Processing:** pdf.js for on-device viewing and text extraction, jsPDF for exporting.
+- **Excel Processing:** SheetJS (xlsx) for structured local parsing.
 
 ## Development
 
 1. Clone the repository
 2. Run `npm install`
-3. Create a `.env` file and add `GROQ_API_KEY=your_api_key_here`
-4. Run `npm run dev`
+3. Run `npm run dev`
