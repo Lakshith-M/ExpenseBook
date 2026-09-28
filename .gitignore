@@ -1,3 +1,7 @@
 node_modules/
 .DS_Store
-References for antigravity/
+References for antigravity/*.apk
+api/
+test-groq.js
+.env
+READ THIS ANTIGRAVITY

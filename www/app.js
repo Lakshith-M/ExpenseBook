@@ -1,4 +1,3 @@
-import { getCategory } from './categorise.js';
 let importHistory = [];
 let accounts = [];
 let activeAccountId = 'acc_default';
@@ -258,12 +257,11 @@ document.getElementById('fabBtn').addEventListener('click', () => {
     document.getElementById('date').valueAsDate = new Date();
     
     // Do not restore previous defaults, user wants a fresh form
-    // if (lastAddedTx) {
-    //     document.querySelector(`input[name="type"][value="${lastAddedTx.type}"]`).checked = true;
-    //     document.querySelector(`input[name="paymentMethod"][value="${lastAddedTx.paymentMethod}"]`).checked = true;
-    //     document.getElementById('title').value = lastAddedTx.title;
-    //     document.getElementById('category').value = lastAddedTx.category;
-    // }
+    if (lastAddedTx) {
+        document.querySelector(`input[name="type"][value="${lastAddedTx.type}"]`).checked = true;
+        document.querySelector(`input[name="paymentMethod"][value="${lastAddedTx.paymentMethod}"]`).checked = true;
+        document.getElementById('category').value = lastAddedTx.category;
+    }
     
     openModal(transactionModal);
     updateUpiPayVisibility();
@@ -627,27 +625,12 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
     const amount = parseFloat(document.getElementById('amount').value);
     const rawTitle = document.getElementById('title').value.trim();
     let category = document.getElementById('category').value;
-    let suggestion = null;
-    // If category empty, ask AI
-    if (!category) {
-        const spinner = document.getElementById('categorySpinner');
-        spinner.classList.remove('hidden');
-        try {
-            suggestion = await getCategory(rawTitle);
-            if (suggestion && suggestion.category) {
-                category = suggestion.category;
-                document.getElementById('category').value = category;
-            }
-        } catch (err) {
-            console.error('Category suggestion failed (fallback failed?)', err);
-        } finally {
-            spinner.classList.add('hidden');
-        }
-    }
     const title = rawTitle || category;
     const date = document.getElementById('date').value;
+    const description = document.getElementById('description').value.trim();
 
     const tx = {
+        description,
         id: txId || Date.now().toString(),
         accountId: activeAccountId,
         type,
@@ -656,8 +639,8 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
         title,
         category,
         date,
-        aiSuggested: !!(suggestion && suggestion.category),
-        catScore: suggestion ? suggestion.confidence : null
+        aiSuggested: false,
+        catScore: null
     };
 
     if (window.isUpiPayFlow) {
@@ -704,32 +687,7 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
     renderTransactions();
 });
 
-// Add Category Form
-async function autoAssignCategory() {
-    const rawTitle = document.getElementById('title').value.trim();
-    if (!rawTitle) return;
-    
-    const spinner = document.getElementById('categorySpinner');
-    spinner.classList.remove('hidden');
-    try {
-        const suggestion = await getCategory(rawTitle);
-        if (suggestion && suggestion.category) {
-            document.getElementById('category').value = suggestion.category;
-        }
-    } catch (err) {
-        console.error('Category suggestion failed', err);
-    } finally {
-        spinner.classList.add('hidden');
-    }
-}
 
-let titleDebounceTimer;
-document.getElementById('title').addEventListener('input', () => {
-    clearTimeout(titleDebounceTimer);
-    titleDebounceTimer = setTimeout(() => {
-        autoAssignCategory();
-    }, 1000); // 1 second debounce
-});
 
 
 // Add Account Form
@@ -810,6 +768,8 @@ function editTransaction(id) {
     }
 
     document.getElementById('amount').value = tx.amount;
+    document.getElementById('title').value = tx.title || '';
+    document.getElementById('description').value = tx.description || '';
     document.getElementById('category').value = tx.category;
     document.getElementById('date').value = tx.date;
 
@@ -1024,6 +984,7 @@ function renderTransactions() {
             <div class="tx-row tx-body-row">
                 <div class="tx-title-group">
                     <h4>${escapeHTML(displayTitle)}</h4>
+                    ${tx.description ? `<div style="font-size: 0.8rem; color: var(--text-secondary); margin: 4px 0; line-height: 1.3; font-style: italic; opacity: 0.8;">${escapeHTML(tx.description)}</div>` : ''}
                     <span class="tx-category-badge" title="Original: ${escapeHTML(tx.title)}">
                         <i class="fa-solid fa-tag" style="margin-right: 4px;"></i>${escapeHTML(tx.category)} &nbsp;|&nbsp; ${methodIcon} ${txMethod}
                     </span>
@@ -1674,7 +1635,8 @@ document.getElementById('excelFileInput').addEventListener('change', function (e
     // Show Import Options modal
     document.getElementById('importOptionsFileNameText').textContent = file.name;
     document.getElementById('importFilePassword').value = '';
-    document.getElementById('importAiInstructions').value = '';
+    document.getElementById('importStartDate').value = '';
+    document.getElementById('importEndDate').value = '';
     openModal(document.getElementById('importOptionsModal'));
 });
 
@@ -1683,30 +1645,40 @@ document.getElementById('importOptionsProcessBtn').addEventListener('click', asy
     if (!file) return;
 
     const password = document.getElementById('importFilePassword').value.trim();
-    const instructions = document.getElementById('importAiInstructions').value.trim();
+    const startDate = document.getElementById('importStartDate').value;
+    const endDate = document.getElementById('importEndDate').value;
 
     closeModal(document.getElementById('importOptionsModal'));
 
-    // Show AI loading state
     const loadingModal = document.getElementById('importSummaryModal');
     const loadingMsg = document.getElementById('importSummaryMsg');
     if (loadingMsg) {
-        loadingMsg.innerHTML = '<i class="fa-solid fa-robot" style="color: var(--primary); margin-right: 8px;"></i> AI is reading your statement...<br><small style="color: var(--text-secondary);">This may take a few seconds.</small>';
+        loadingMsg.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="color: var(--primary); margin-right: 8px;"></i> Parsing your statement...';
         openModal(loadingModal);
     }
 
     try {
         let parsedTxs = [];
         if (file.name.toLowerCase().endsWith('.pdf')) {
-            parsedTxs = await parsePDFStatement(file, password, instructions);
+            parsedTxs = await parsePDFStatement(file, password);
         } else {
-            parsedTxs = await parseExcelStatement(file, instructions);
+            parsedTxs = await parseExcelStatement(file);
+        }
+
+        // Apply date range filter
+        if (startDate || endDate) {
+            const start = startDate ? new Date(startDate).getTime() : 0;
+            const end = endDate ? new Date(endDate).getTime() : Infinity;
+            parsedTxs = parsedTxs.filter(tx => {
+                const txTime = new Date(tx.date).getTime();
+                return txTime >= start && txTime <= end;
+            });
         }
 
         if (loadingMsg) closeModal(loadingModal);
 
         if (parsedTxs.length === 0) {
-            alert("No transactions found. Try adjusting your AI instructions or check if the file is correct.");
+            alert("No transactions found in this date range. Check if the file is correct.");
             return;
         }
 
@@ -1746,8 +1718,12 @@ function showImportPreview(parsedTxs, fileObj) {
             <div style="flex: 1; min-width: 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
                     <span style="font-weight: 500; font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;">${tx.title || 'Unknown'}</span>
+                </div>
+                ${tx.description ? `<div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; line-height: 1.3; font-style: italic; opacity: 0.8;">${escapeHTML(tx.description)}</div>` : ''}
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; display: none;">
                     <span style="color: ${color}; font-weight: 600; font-size: 0.95rem; flex-shrink: 0;">${sign}₹${parseFloat(tx.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
+                ${tx.description ? `<div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; line-height: 1.3; font-style: italic; opacity: 0.8;">${escapeHTML(tx.description)}</div>` : ''}
                 <div style="display: flex; gap: 0.5rem; margin-top: 4px; flex-wrap: wrap;">
                     <span style="font-size: 0.75rem; color: var(--text-secondary);">${dateStr}</span>
                     <span style="font-size: 0.75rem; background: rgba(59,130,246,0.1); color: var(--primary); border-radius: 4px; padding: 0 5px;">${tx.category || 'Undefined'}</span>
@@ -2112,7 +2088,7 @@ function parseCanaraBankPDFText(fullText) {
         const dParts = tx.dateStr.split('-');
         if (dParts.length === 3) {
             const isoDate = `${dParts[2]}-${dParts[1]}-${dParts[0]}`;
-            parsedTxs.push({ date: isoDate, title: tx.narration.substring(0, 80) || 'Bank Transaction', amount: tx.amount, type: type, paymentMethod: 'UPI' });
+            parsedTxs.push({ date: isoDate, title: tx.narration.substring(0, 80) || 'Bank Transaction', description: tx.narration, amount: tx.amount, type: type, paymentMethod: 'UPI' });
         }
     };
 
@@ -2208,6 +2184,7 @@ function processImportedTransactions(parsedTxs, fileObj) {
                 paymentMethod: tx.paymentMethod || 'UPI',
                 amount: tx.amount,
                 title: tx.title,
+                description: tx.description || '',
                 originalTitle: tx.title,
                 category: tx.category || 'Uncategorized',
                 date: tx.date

@@ -240,14 +240,15 @@
                     <input type="text" id="title" placeholder="e.g. Lunch at Canteen">
                 </div>
                 <div class="form-group">
+                    <label>Description / Narration</label>
+                    <textarea id="description" class="select-input" rows="2" placeholder="Extra details from bank or yourself..." style="resize: vertical; font-family: inherit; margin-top: 5px;"></textarea>
+                </div>
+                <div class="form-group">
                     <label>Category</label>
                     <div class="category-wrapper" style="display:flex; align-items:center;">
                         <select id="category" required style="flex:1;">
                             <!-- Categories injected by JS -->
                         </select>
-                        <button type="button" id="autoAssignBtn" class="icon-btn hidden" title="Auto‑assign category" style="margin-left:8px; display: none;">
-                            <i class="fa-solid fa-magic"></i>
-                        </button>
                         <div id="categorySpinner" class="spinner hidden" style="margin-left:8px;"></div>
                     </div>
                 </div>
@@ -445,19 +446,26 @@
                 </div>
                 <div class="form-group">
                     <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.4rem; display: block;">
-                        <i class="fa-solid fa-lock" style="margin-right: 5px;"></i> File Password <span style="font-weight: 400; opacity: 0.6;">(if the file is password protected)</span>
+                        <i class="fa-solid fa-lock" style="margin-right: 5px;"></i> File Password <span style="font-weight: 400; opacity: 0.6;">(if protected)</span>
                     </label>
                     <input type="password" id="importFilePassword" class="select-input" placeholder="Leave blank if not protected" autocomplete="off">
                 </div>
-                <div class="form-group">
-                    <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.4rem; display: block;">
-                        <i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 5px;"></i> AI Instructions <span style="font-weight: 400; opacity: 0.6;">(optional)</span>
-                    </label>
-                    <textarea id="importAiInstructions" class="select-input" rows="3" placeholder="e.g. &#10;- Only import the last 10 transactions&#10;- Skip all salary credits&#10;- Treat 'NEFT' entries as Bank transfers" style="resize: vertical; min-height: 80px; font-family: inherit;"></textarea>
-                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.4rem;">Tell the AI exactly what to extract. Leave blank to import all transactions.</p>
+                <div class="form-group" style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.4rem; display: block;">
+                            Start Date <span style="font-weight: 400; opacity: 0.6;">(optional)</span>
+                        </label>
+                        <input type="date" id="importStartDate" class="select-input">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.4rem; display: block;">
+                            End Date <span style="font-weight: 400; opacity: 0.6;">(optional)</span>
+                        </label>
+                        <input type="date" id="importEndDate" class="select-input">
+                    </div>
                 </div>
                 <button id="importOptionsProcessBtn" class="btn" style="background: var(--primary); color: white; width: 100%; padding: 0.8rem; font-size: 1rem;">
-                    <i class="fa-solid fa-robot" style="margin-right: 6px;"></i> Process with AI
+                    <i class="fa-solid fa-file-import" style="margin-right: 6px;"></i> Parse File
                 </button>
             </div>
         </div>
@@ -541,7 +549,6 @@
         </div>
     </div>
 
-    <script type="module" src="categorise.js?v=23"></script>
     <script type="module" src="app.js?v=23"></script>
 </body>
 
