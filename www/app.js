@@ -126,6 +126,7 @@ function init() {
 
     populateCategoryDropdowns();
     renderCategoryList();
+    renderFilterUpiIdsList();
     populateAccountSelector();
     renderAccountList();
     
@@ -311,6 +312,7 @@ let myUpiIds = JSON.parse(localStorage.getItem('expensebook_upi_ids') || '[]');
 
 function saveUpiIds() {
     localStorage.setItem('expensebook_upi_ids', JSON.stringify(myUpiIds));
+    renderFilterUpiIdsList();
 }
 
 function renderUpiIdsList() {
@@ -394,6 +396,7 @@ function generateReceiveQR(upiId, amount) {
 
     document.getElementById('receiveQrAmountText').innerText = `₹${amount}`;
     document.getElementById('receiveQrUpiText').innerText = upiId;
+    window.pendingReceiveUpiId = upiId;
 
     const qrContainer = document.getElementById('receiveQrContainer');
     qrContainer.innerHTML = '';
@@ -639,6 +642,7 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
         title,
         category,
         date,
+        upiId: (type === 'income' && paymentMethod === 'UPI' && window.pendingReceiveUpiId) ? window.pendingReceiveUpiId : (txId ? (transactions.find(t => t.id === txId)?.upiId || null) : null),
         aiSuggested: false,
         catScore: null
     };
@@ -664,6 +668,7 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
 
     // Save for next time
     lastAddedTx = { type, paymentMethod, title, category };
+    if (type === 'income' && paymentMethod === 'UPI') window.pendingReceiveUpiId = null;
 
     // Reset and close immediately
     e.target.reset();
@@ -940,7 +945,11 @@ function renderTransactions() {
         const safeMethodFilter = (methodFilter || '').trim().toLowerCase();
         const matchMethod = safeMethodFilter === 'all' || safeMethodFilter === 'all methods' || safeMethodFilter === '' || txMethod === methodFilter;
 
-        return matchCat && matchStart && matchEnd && matchSearch && matchType && matchMethod;
+        let matchUpiId = true;
+        if (typeFilter === 'income' && methodFilter === 'UPI' && activeUpiIds.length > 0) {
+            matchUpiId = t.upiId && activeUpiIds.includes(t.upiId);
+        }
+        return matchCat && matchStart && matchEnd && matchSearch && matchType && matchMethod && matchUpiId;
     });
 
     currentFilteredTransactions = filtered;
@@ -1003,6 +1012,41 @@ function renderTransactions() {
         transactionListEl.appendChild(item);
     });
 }
+
+
+function updateFilterVisibility() {
+    const filterTxType = typeFilter || ''; // e.g. 'income'
+    const filterMethod = methodFilter || ''; // e.g. 'UPI'
+    const container = document.getElementById('filterUpiIdsContainer');
+    if (filterTxType === 'income' && filterMethod === 'UPI') {
+        container.style.display = 'block';
+    } else {
+        container.style.display = 'none';
+    }
+}
+
+function renderFilterUpiIdsList() {
+    const list = document.getElementById('filterUpiIdsDropdown');
+    list.innerHTML = '';
+    myUpiIds.forEach(id => {
+        const label = document.createElement('label');
+        label.className = 'checkbox-label';
+        label.innerHTML = `<input type="checkbox" value="${escapeHTML(id)}" ${activeUpiIds.includes(id) ? 'checked' : ''}> ${escapeHTML(id)}`;
+        
+        const cb = label.querySelector('input');
+        cb.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                if (!activeUpiIds.includes(id)) activeUpiIds.push(id);
+            } else {
+                activeUpiIds = activeUpiIds.filter(x => x !== id);
+            }
+            document.getElementById('filterUpiIdsHeader').textContent = activeUpiIds.length > 0 ? `${activeUpiIds.length} UPI IDs selected` : 'All UPI IDs';
+            renderTransactions();
+        });
+        list.appendChild(label);
+    });
+}
+
 
 function renderCategoryList() {
     const list = document.getElementById('categoryList');
@@ -1869,9 +1913,37 @@ async function parseExcelStatement(file, instructions) {
                     return;
                 }
 
-                // ── Fallback removed ──
-                reject(new Error("Unsupported Excel/CSV format. Could not detect standard columns locally."));
-                return;
+                // ── Fallback: send to AI for unstructured files ──
+                const rawText = rows.map(r => Array.isArray(r) ? r.join(', ') : '').join('\n');
+                const cats = validCats;
+                const baseUrl = (window.location.protocol === 'https:' && !window.location.hostname.includes('localhost'))
+                    ? window.location.origin
+                    : 'https://expense-book-gamma.vercel.app';
+
+                const res = await fetch(`${baseUrl}/api/parse-statement`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: rawText, categories: cats, instructions })
+                });
+                if (!res.ok) {
+                    let errMessage = 'AI parsing failed (Server Error)';
+                    try {
+                        const err = await res.json();
+                        errMessage = err.error || errMessage;
+                    } catch (e) {
+                        const text = await res.text();
+                        console.error("Non-JSON error response:", text.substring(0, 200));
+                        if (res.status === 504) errMessage = 'Request timed out. The AI took too long to respond.';
+                    }
+                    throw new Error(errMessage);
+                }
+                const responseText = await res.text();
+                try {
+                    resolve(JSON.parse(responseText));
+                } catch(e) {
+                    console.error('Response was not JSON:', responseText.substring(0, 300));
+                    throw new Error('Server returned an unexpected response. Please try again.');
+                }
             } catch(err) { reject(err); }
 
         };
@@ -1912,13 +1984,37 @@ async function parsePDFStatement(file, password, instructions) {
                     fullText += "\n\n--- PAGE BREAK ---\n\n";
                 }
                 
-                // Route to appropriate local parser based on content
-                if (fullText.includes('Canara') || fullText.includes('CANARA')) {
-                    resolve(parseCanaraBankPDFText(fullText));
-                } else if (fullText.toLowerCase().includes('expensebook') || fullText.includes('ExpenseBook')) {
-                    resolve(parseExpenseBookPDFText(fullText));
-                } else {
-                    reject(new Error("Unsupported PDF format. Currently only Canara Bank and ExpenseBook PDFs are supported."));
+                // Call AI endpoint
+                const cats = Array.from(document.getElementById('category').options).map(opt => opt.value);
+                const baseUrl = (window.location.protocol === 'https:' && !window.location.hostname.includes('localhost'))
+                    ? window.location.origin
+                    : 'https://expense-book-gamma.vercel.app';
+                    
+                const response = await fetch(`${baseUrl}/api/parse-statement`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: fullText, categories: cats, instructions })
+                });
+                
+                if (!response.ok) {
+                    let errMessage = 'AI parsing failed (Server Error)';
+                    try {
+                        const err = await response.json();
+                        errMessage = err.error || errMessage;
+                    } catch (e) {
+                        const text = await response.text();
+                        console.error("Non-JSON error response:", text.substring(0, 200));
+                        if (response.status === 504) errMessage = 'Request timed out. The AI took too long to respond.';
+                    }
+                    throw new Error(errMessage);
+                }
+                
+                const responseText = await response.text();
+                try {
+                    resolve(JSON.parse(responseText));
+                } catch(e) {
+                    console.error('Response was not JSON:', responseText.substring(0, 300));
+                    throw new Error('Server returned an unexpected response. Please try again.');
                 }
             } catch (err) {
                 reject(err);
@@ -2321,3 +2417,5 @@ window.editTransaction = editTransaction;
 window.deleteTransaction = deleteTransaction;
 window.deleteCategory = deleteCategory;
 
+document.getElementById('filterUpiIdsHeader').addEventListener('click', (e) => { e.stopPropagation(); document.getElementById('filterUpiIdsDropdown').classList.toggle('hidden'); document.getElementById('multiSelectDropdown').classList.add('hidden'); document.getElementById('txTypeDropdown').classList.add('hidden'); document.getElementById('paymentMethodDropdown').classList.add('hidden'); });
+window.addEventListener('click', (e) => { if (!e.target.closest('#filterUpiIdsContainer')) { const uDrop = document.getElementById('filterUpiIdsDropdown'); if (uDrop) uDrop.classList.add('hidden'); } });
