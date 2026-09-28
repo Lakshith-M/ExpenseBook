@@ -1869,37 +1869,9 @@ async function parseExcelStatement(file, instructions) {
                     return;
                 }
 
-                // ── Fallback: send to AI for unstructured files ──
-                const rawText = rows.map(r => Array.isArray(r) ? r.join(', ') : '').join('\n');
-                const cats = validCats;
-                const baseUrl = (window.location.protocol === 'https:' && !window.location.hostname.includes('localhost'))
-                    ? window.location.origin
-                    : 'https://expense-book-gamma.vercel.app';
-
-                const res = await fetch(`${baseUrl}/api/parse-statement`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: rawText, categories: cats, instructions })
-                });
-                if (!res.ok) {
-                    let errMessage = 'AI parsing failed (Server Error)';
-                    try {
-                        const err = await res.json();
-                        errMessage = err.error || errMessage;
-                    } catch (e) {
-                        const text = await res.text();
-                        console.error("Non-JSON error response:", text.substring(0, 200));
-                        if (res.status === 504) errMessage = 'Request timed out. The AI took too long to respond.';
-                    }
-                    throw new Error(errMessage);
-                }
-                const responseText = await res.text();
-                try {
-                    resolve(JSON.parse(responseText));
-                } catch(e) {
-                    console.error('Response was not JSON:', responseText.substring(0, 300));
-                    throw new Error('Server returned an unexpected response. Please try again.');
-                }
+                // ── Fallback removed ──
+                reject(new Error("Unsupported Excel/CSV format. Could not detect standard columns locally."));
+                return;
             } catch(err) { reject(err); }
 
         };
@@ -1940,37 +1912,13 @@ async function parsePDFStatement(file, password, instructions) {
                     fullText += "\n\n--- PAGE BREAK ---\n\n";
                 }
                 
-                // Call AI endpoint
-                const cats = Array.from(document.getElementById('category').options).map(opt => opt.value);
-                const baseUrl = (window.location.protocol === 'https:' && !window.location.hostname.includes('localhost'))
-                    ? window.location.origin
-                    : 'https://expense-book-gamma.vercel.app';
-                    
-                const response = await fetch(`${baseUrl}/api/parse-statement`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: fullText, categories: cats, instructions })
-                });
-                
-                if (!response.ok) {
-                    let errMessage = 'AI parsing failed (Server Error)';
-                    try {
-                        const err = await response.json();
-                        errMessage = err.error || errMessage;
-                    } catch (e) {
-                        const text = await response.text();
-                        console.error("Non-JSON error response:", text.substring(0, 200));
-                        if (response.status === 504) errMessage = 'Request timed out. The AI took too long to respond.';
-                    }
-                    throw new Error(errMessage);
-                }
-                
-                const responseText = await response.text();
-                try {
-                    resolve(JSON.parse(responseText));
-                } catch(e) {
-                    console.error('Response was not JSON:', responseText.substring(0, 300));
-                    throw new Error('Server returned an unexpected response. Please try again.');
+                // Route to appropriate local parser based on content
+                if (fullText.includes('Canara') || fullText.includes('CANARA')) {
+                    resolve(parseCanaraBankPDFText(fullText));
+                } else if (fullText.toLowerCase().includes('expensebook') || fullText.includes('ExpenseBook')) {
+                    resolve(parseExpenseBookPDFText(fullText));
+                } else {
+                    reject(new Error("Unsupported PDF format. Currently only Canara Bank and ExpenseBook PDFs are supported."));
                 }
             } catch (err) {
                 reject(err);
@@ -2372,3 +2320,4 @@ init();
 window.editTransaction = editTransaction;
 window.deleteTransaction = deleteTransaction;
 window.deleteCategory = deleteCategory;
+
