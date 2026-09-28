@@ -1834,63 +1834,95 @@ async function parseExcelStatement(file, instructions) {
 
                 if (rows.length < 2) { resolve([]); return; }
 
-                // ── Try direct structured parse first ──
-                const header = rows[0].map(h => String(h).toLowerCase().trim());
-                const colDate   = header.findIndex(h => /date/.test(h));
-                const colTitle  = header.findIndex(h => /desc|title|narr|particular|name/.test(h));
-                const colAmount = header.findIndex(h => /amount|amt|debit|credit/.test(h));
-                const colType   = header.findIndex(h => /type|kind/.test(h));
-                const colMethod = header.findIndex(h => /method|payment|mode|channel/.test(h));
-                const colCat    = header.findIndex(h => /categ/.test(h));
+                // ── Try direct structured parse first (Search up to row 50 for headers) ──
+                let headerRowIdx = -1;
+                for (let i = 0; i < Math.min(50, rows.length); i++) {
+                    const rowStr = rows[i].join(' ').toLowerCase();
+                    if (rowStr.includes('date') && (rowStr.includes('narration') || rowStr.includes('desc') || rowStr.includes('particular')) && (rowStr.includes('amount') || rowStr.includes('withdrawal') || rowStr.includes('debit'))) {
+                        headerRowIdx = i;
+                        break;
+                    }
+                }
 
-                const validCats = Array.from(document.getElementById('category').options).map(opt => opt.value);
+                if (headerRowIdx !== -1) {
+                    const header = rows[headerRowIdx].map(h => String(h).toLowerCase().trim());
+                    const colDate   = header.findIndex(h => /date/.test(h));
+                    const colTitle  = header.findIndex(h => /desc|title|narr|particular|name/.test(h));
+                    
+                    // Support single amount column or separate withdrawal/deposit columns
+                    const colAmount = header.findIndex(h => h === 'amount' || h === 'amt');
+                    const colWithdrawal = header.findIndex(h => h.includes('withdrawal') || h.includes('debit'));
+                    const colDeposit = header.findIndex(h => h.includes('deposit') || h.includes('credit'));
 
-                if (colDate !== -1 && colTitle !== -1 && colAmount !== -1) {
-                    // AI validates and processes the structured data
-                    await new Promise(r => setTimeout(r, 1500));
-                    const txs = [];
-                    for (let i = 1; i < rows.length; i++) {
+                    const colType   = header.findIndex(h => /type|kind/.test(h));
+                    const colMethod = header.findIndex(h => /method|payment|mode|channel/.test(h));
+                    const colCat    = header.findIndex(h => /categ/.test(h));
+
+                    const validCats = Array.from(document.getElementById('category').options).map(opt => opt.value);
+
+                    let txs = [];
+                    for (let i = headerRowIdx + 1; i < rows.length; i++) {
                         const row = rows[i];
-                        const rawDate = row[colDate];
-                        const rawTitle = row[colTitle];
-                        const rawAmount = row[colAmount];
-                        if (!rawTitle || !rawAmount) continue;
+                        if (!row[colDate] || !String(row[colDate]).trim()) continue; // Skip empty rows
 
-                        // Parse date — XLSX may return Excel serial numbers (e.g. 45519 for Aug 15 2024)
-                        let date = '';
-                        try {
-                            if (typeof rawDate === 'number') {
-                                // Excel serial: days since Jan 1 1900 (with leap-year bug offset of 25569 to Unix epoch)
-                                const jsDate = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
-                                if (!isNaN(jsDate)) date = jsDate.toISOString().split('T')[0];
-                            } else {
-                                const d = new Date(rawDate);
-                                if (!isNaN(d)) date = d.toISOString().split('T')[0];
+                        // Stop parsing if we hit a row that looks like a footer or end of statement
+                        const dateStr = String(row[colDate]).trim().toLowerCase();
+                        if (dateStr.includes('statement') || dateStr.includes('balance') || dateStr.includes('closing') || dateStr.includes('total') || dateStr.includes('*')) {
+                            continue; // Often HDFC masks dates with *** at the end
+                        }
+
+                        // Try parsing date. HDFC uses DD/MM/YY. Try to convert to YYYY-MM-DD
+                        let date = dateStr;
+                        const dateParts = date.split('/');
+                        if (dateParts.length === 3) {
+                            let [dd, mm, yy] = dateParts;
+                            if (yy.length === 2) yy = '20' + yy;
+                            date = `${yy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+                        } else {
+                            // If Date parse fails, we'll just try to use the raw value
+                            const parsedDate = new Date(date);
+                            if (!isNaN(parsedDate)) {
+                                date = parsedDate.toISOString().split('T')[0];
                             }
-                        } catch {}
-
-                        // Parse amount
-                        const amount = parseFloat(String(rawAmount).replace(/[^0-9.]/g, '')) || 0;
-                        if (amount === 0) continue;
-
-                        // Type
+                        }
+                        
+                        // Parse amounts
+                        let amount = 0;
                         let type = 'expense';
-                        if (colType !== -1) {
-                            const t = String(row[colType]).toLowerCase();
-                            if (t.includes('income') || t.includes('credit')) type = 'income';
+                        
+                        if (colWithdrawal !== -1 && row[colWithdrawal]) {
+                            amount = parseFloat(String(row[colWithdrawal]).replace(/[^0-9.]/g, ''));
+                            type = 'expense';
+                        } else if (colDeposit !== -1 && row[colDeposit]) {
+                            amount = parseFloat(String(row[colDeposit]).replace(/[^0-9.]/g, ''));
+                            type = 'income';
+                        } else if (colAmount !== -1 && row[colAmount]) {
+                            amount = parseFloat(String(row[colAmount]).replace(/[^0-9.-]/g, ''));
+                            if (amount < 0) {
+                                type = 'expense';
+                                amount = Math.abs(amount);
+                            } else if (colType !== -1) {
+                                type = String(row[colType]).toLowerCase().includes('in') ? 'income' : 'expense';
+                            }
                         }
 
-                        // Method
-                        let method = 'Bank';
-                        if (colMethod !== -1) {
-                            const m = String(row[colMethod]).toLowerCase();
-                            if (m.includes('upi')) method = 'UPI';
-                            else if (m.includes('cash')) method = 'Cash';
+                        if (isNaN(amount) || amount === 0) continue;
+
+                        const rawTitle = row[colTitle] || 'Unknown';
+                        
+                        // Determine payment method from title
+                        let method = 'UPI';
+                        if (colMethod !== -1 && row[colMethod]) {
+                            method = String(row[colMethod]).trim();
+                        } else {
+                            const tLow = String(rawTitle).toLowerCase();
+                            if (tLow.includes('cash') || tLow.includes('atm')) method = 'Cash';
+                            else if (tLow.includes('upi')) method = 'UPI';
+                            else method = 'Bank';
                         }
 
-                        // Category
                         let category = 'Undefined';
-                        if (colCat !== -1) {
+                        if (colCat !== -1 && row[colCat]) {
                             const c = String(row[colCat]).trim();
                             const match = validCats.find(v => v.toLowerCase() === c.toLowerCase());
                             category = match || 'Undefined';
@@ -1913,37 +1945,8 @@ async function parseExcelStatement(file, instructions) {
                     return;
                 }
 
-                // ── Fallback: send to AI for unstructured files ──
-                const rawText = rows.map(r => Array.isArray(r) ? r.join(', ') : '').join('\n');
-                const cats = validCats;
-                const baseUrl = (window.location.protocol === 'https:' && !window.location.hostname.includes('localhost'))
-                    ? window.location.origin
-                    : 'https://expense-book-gamma.vercel.app';
-
-                const res = await fetch(`${baseUrl}/api/parse-statement`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: rawText, categories: cats, instructions })
-                });
-                if (!res.ok) {
-                    let errMessage = 'AI parsing failed (Server Error)';
-                    try {
-                        const err = await res.json();
-                        errMessage = err.error || errMessage;
-                    } catch (e) {
-                        const text = await res.text();
-                        console.error("Non-JSON error response:", text.substring(0, 200));
-                        if (res.status === 504) errMessage = 'Request timed out. The AI took too long to respond.';
-                    }
-                    throw new Error(errMessage);
-                }
-                const responseText = await res.text();
-                try {
-                    resolve(JSON.parse(responseText));
-                } catch(e) {
-                    console.error('Response was not JSON:', responseText.substring(0, 300));
-                    throw new Error('Server returned an unexpected response. Please try again.');
-                }
+                // ── Fallback removed ──
+                reject(new Error("Unsupported Excel/CSV format. Could not detect standard columns locally. Please use standard format or HDFC Bank format."));
             } catch(err) { reject(err); }
 
         };
@@ -1984,37 +1987,13 @@ async function parsePDFStatement(file, password, instructions) {
                     fullText += "\n\n--- PAGE BREAK ---\n\n";
                 }
                 
-                // Call AI endpoint
-                const cats = Array.from(document.getElementById('category').options).map(opt => opt.value);
-                const baseUrl = (window.location.protocol === 'https:' && !window.location.hostname.includes('localhost'))
-                    ? window.location.origin
-                    : 'https://expense-book-gamma.vercel.app';
-                    
-                const response = await fetch(`${baseUrl}/api/parse-statement`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: fullText, categories: cats, instructions })
-                });
-                
-                if (!response.ok) {
-                    let errMessage = 'AI parsing failed (Server Error)';
-                    try {
-                        const err = await response.json();
-                        errMessage = err.error || errMessage;
-                    } catch (e) {
-                        const text = await response.text();
-                        console.error("Non-JSON error response:", text.substring(0, 200));
-                        if (response.status === 504) errMessage = 'Request timed out. The AI took too long to respond.';
-                    }
-                    throw new Error(errMessage);
-                }
-                
-                const responseText = await response.text();
-                try {
-                    resolve(JSON.parse(responseText));
-                } catch(e) {
-                    console.error('Response was not JSON:', responseText.substring(0, 300));
-                    throw new Error('Server returned an unexpected response. Please try again.');
+                // Route to appropriate local parser based on content
+                if (fullText.includes('Canara') || fullText.includes('CANARA')) {
+                    resolve(parseCanaraBankPDFText(fullText));
+                } else if (fullText.toLowerCase().includes('expensebook') || fullText.includes('ExpenseBook')) {
+                    resolve(parseExpenseBookPDFText(fullText));
+                } else {
+                    reject(new Error("Unsupported PDF format. Currently only Canara Bank and ExpenseBook PDFs are supported."));
                 }
             } catch (err) {
                 reject(err);
